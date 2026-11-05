@@ -10,6 +10,7 @@ Estetoscópio digital experimental: um ESP32-C3 Super Mini amostra o sinal de um
 |---|---|
 | `index.html` | App web (arquivo único). Publicado via GitHub Pages. |
 | `firmware/esp32c3_ausculta.ino` | Firmware mínimo: amostra o ADC e envia por BLE. |
+| `docs/estetoscopio-esp32-documentacao.pdf` | Documentação técnica (formato IEEE): justificativa, arquitetura, telas, simulação, contrato do firmware, pontos em aberto. Fonte em `docs/relatorio.tex` (xelatex). |
 | `sim/*.wav` | Gravações reais (4 kHz, banda 20–1000 Hz) usadas pelo botão **Simular**. |
 
 ## Como usar o app
