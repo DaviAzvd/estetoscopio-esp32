@@ -23,7 +23,7 @@
   canvas{width:100%;display:block;background:#0c0f13;border-radius:8px}
   #wave,#env{height:150px} #spec{height:190px}
   #status{color:var(--mut);font-size:13px;width:100%}
-  svg{width:100%;max-height:260px;display:block}
+  svg{width:100%;max-height:300px;display:block}
   .site{fill:#2a323d;stroke:#4a5563;stroke-width:1.5;cursor:pointer}
   .site.sel{fill:var(--acc);stroke:#fff}
   .site.hr.sel{fill:var(--acc2)}
@@ -61,8 +61,9 @@
   <div class="card"><div class="lbl" id="xLbl">Razão I:E</div><div class="big" id="xVal">—</div><div class="lbl" id="xUnit">insp : exp</div></div>
 
   <div class="card" style="grid-row:span 2">
-    <div class="row" style="justify-content:space-between"><div class="lbl">Posição — <span id="siteName">não definida</span></div><button id="bView" class="sm">Ver posterior</button></div>
-    <svg id="torso" viewBox="0 0 200 240"></svg>
+    <div class="lbl">Posição do microfone — <span id="siteName">toque em um ponto</span></div>
+    <svg id="torso" viewBox="0 0 410 262"></svg>
+    <div id="siteInstr" style="font-size:13px;color:#cbd3dd;margin-top:8px;line-height:1.4"></div>
   </div>
   <div class="card wide" style="grid-column:2/-1"><div class="lbl">Fonocardiograma filtrado — <span id="bandLbl"></span> (últimos 4 s)</div><canvas id="wave"></canvas></div>
   <div class="card wide" style="grid-column:2/-1"><div class="lbl">Espectrograma do sinal bruto (0–<span id="fmax"></span> Hz, últimos 8 s; linhas = banda do modo)</div><canvas id="spec"></canvas></div>
@@ -116,38 +117,74 @@ function buildFilters(){
   $('bandLbl').textContent=b.n; $('fmax').textContent=FS/2;
 }
 
-/* -------------------------- posições anatômicas ---------------------------- */
+/* -------------------------- posições anatômicas (2 por modo) ---------------- */
+// view: 'ant' (frente) ou 'post' (costas); x,y no torso correspondente (viewBox 0 0 200 260 cada)
 const SITES={
- 0:{ant:[{id:'a_apD',n:'Ápice direito (ant.)',x:72,y:62},{id:'a_apE',n:'Ápice esquerdo (ant.)',x:128,y:62},
-        {id:'a_mdD',n:'Campo médio direito (ant.)',x:62,y:100},{id:'a_mdE',n:'Campo médio esquerdo (ant.)',x:138,y:100},
-        {id:'a_bsD',n:'Base direita (ant.)',x:66,y:140},{id:'a_bsE',n:'Base esquerda (ant.)',x:134,y:140}],
-    post:[{id:'p_apD',n:'Ápice direito (post.)',x:72,y:55},{id:'p_apE',n:'Ápice esquerdo (post.)',x:128,y:55},
-        {id:'p_ieD',n:'Interescapular direito',x:78,y:100},{id:'p_ieE',n:'Interescapular esquerdo',x:122,y:100},
-        {id:'p_bsD',n:'Base direita (post.)',x:68,y:150},{id:'p_bsE',n:'Base esquerda (post.)',x:132,y:150}]},
- 1:{ant:[{id:'ao',n:'Foco aórtico (2º EIC D)',x:88,y:78},{id:'pu',n:'Foco pulmonar (2º EIC E)',x:112,y:78},
-        {id:'erb',n:'Ponto de Erb (3º EIC E)',x:110,y:95},{id:'tr',n:'Foco tricúspide (4º EIC E)',x:108,y:112},
-        {id:'mi',n:'Foco mitral (5º EIC, LHC)',x:128,y:128}]}
+ 0:[{id:'r_ant',view:'ant',n:'Frente — 2º espaço intercostal, linha hemiclavicular direita',x:72,y:80,
+     instr:'Paciente sentado, respirando pela boca, um pouco mais fundo que o normal. Apoie o microfone logo abaixo da clavícula direita, entre a 2ª e a 3ª costela, na linha que desce do meio da clavícula.'},
+    {id:'r_post',view:'post',n:'Costas — base pulmonar direita (abaixo da escápula)',x:130,y:172,
+     instr:'Paciente sentado, inclinado levemente à frente, braços cruzados (afasta as escápulas). Apoie o microfone cerca de 3 dedos abaixo da ponta da escápula direita. É o ponto mais sensível para estertores.'}],
+ 1:[{id:'c_mit',view:'ant',n:'Foco mitral — ápice (5º EIC, linha hemiclavicular esquerda)',x:128,y:118,
+     instr:'Paciente deitado ou sentado, inclinado à esquerda. Apoie o microfone abaixo do mamilo esquerdo, entre a 5ª e a 6ª costela. Aqui a 1ª bulha (B1) é mais intensa.'},
+    {id:'c_aor',view:'ant',n:'Foco aórtico — 2º EIC, borda esternal direita',x:88,y:70,
+     instr:'Paciente sentado, inclinado à frente, após expirar. Apoie o microfone à direita do esterno, logo abaixo da clavícula. Aqui a 2ª bulha (B2) é mais intensa.'}]
 };
-let view='ant', site=null;
-const sitesNow=()=>SITES[mode][view]||SITES[mode].ant;
-const allSites=m=>Object.values(SITES[m]).flat();
+let site=null;
+const allSites=m=>SITES[m];
+function torsoSVG(view,ox,dim){ const T={ant:`<g opacity="${dim?.35:1}" transform="translate(${ox},0)">
+  <ellipse cx="100" cy="236" rx="62" ry="12" fill="#000" opacity=".35"/>
+  <!-- pescoço -->
+  <path d="M84 14 Q100 6 116 14 L118 36 Q100 44 82 36 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
+  <!-- tronco: ombros largos, cintura mais estreita -->
+  <path d="M30 48 Q60 34 82 36 Q100 44 118 36 Q140 34 170 48 Q178 70 176 100 Q172 150 160 190 Q150 232 100 238 Q50 232 40 190 Q28 150 24 100 Q22 70 30 48 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".8"/>
+  <!-- braços -->
+  <path d="M30 48 Q10 62 8 95 Q6 135 16 170 L30 166 Q22 130 26 100 Q28 70 36 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
+  <path d="M170 48 Q190 62 192 95 Q194 135 184 170 L170 166 Q178 130 174 100 Q172 70 164 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/><!-- clavículas -->
+  <path d="M46 52 Q75 62 98 54 M154 52 Q125 62 102 54" fill="none" stroke="#54606f" stroke-width="1.3"/>
+  <!-- esterno -->
+  <line x1="100" y1="54" x2="100" y2="128" stroke="#54606f" stroke-width="1.1"/>
+  <!-- peitorais -->
+  <path d="M48 60 Q52 110 98 112 Q100 80 98 56 Q70 56 48 60 Z" fill="#000" opacity=".10"/>
+  <path d="M152 60 Q148 110 102 112 Q100 80 102 56 Q130 56 152 60 Z" fill="#000" opacity=".10"/>
+  <path d="M48 62 Q54 110 98 112 M152 62 Q146 110 102 112" fill="none" stroke="#54606f" stroke-width=".8"/>
+  <circle cx="72" cy="104" r="2.3" fill="#54606f"/><circle cx="128" cy="104" r="2.3" fill="#54606f"/>
+  <!-- rebordo costal -->
+  <path d="M100 128 Q84 136 62 158 M100 128 Q116 136 138 158" fill="none" stroke="#54606f" stroke-width=".9"/>
+  <!-- costelas (sugestão) -->
+  <path d="M56 118 Q78 132 96 124 M144 118 Q122 132 104 124 M58 134 Q78 146 96 138 M142 134 Q122 146 104 138" fill="none" stroke="#434c58" stroke-width=".6"/>
+  <text x="100" y="256" text-anchor="middle" font-size="10" fill="#cbd3dd" font-family="system-ui">FRENTE</text></g>`,post:`<g opacity="${dim?.35:1}" transform="translate(${ox},0)">
+  <ellipse cx="100" cy="236" rx="62" ry="12" fill="#000" opacity=".35"/>
+  <!-- pescoço -->
+  <path d="M84 14 Q100 6 116 14 L118 36 Q100 44 82 36 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
+  <!-- tronco: ombros largos, cintura mais estreita -->
+  <path d="M30 48 Q60 34 82 36 Q100 44 118 36 Q140 34 170 48 Q178 70 176 100 Q172 150 160 190 Q150 232 100 238 Q50 232 40 190 Q28 150 24 100 Q22 70 30 48 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".8"/>
+  <!-- braços -->
+  <path d="M30 48 Q10 62 8 95 Q6 135 16 170 L30 166 Q22 130 26 100 Q28 70 36 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
+  <path d="M170 48 Q190 62 192 95 Q194 135 184 170 L170 166 Q178 130 174 100 Q172 70 164 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/><!-- coluna -->
+  <line x1="100" y1="40" x2="100" y2="225" stroke="#54606f" stroke-width="1.3"/>
+  <!-- escápulas -->
+  <path d="M56 58 L92 66 L94 126 Q74 142 60 124 Z" fill="#000" opacity=".12"/>
+  <path d="M144 58 L108 66 L106 126 Q126 142 140 124 Z" fill="#000" opacity=".12"/>
+  <path d="M56 58 L92 66 L94 126 Q74 142 60 124 Z M144 58 L108 66 L106 126 Q126 142 140 124 Z" fill="none" stroke="#54606f" stroke-width=".9"/>
+  <!-- costelas posteriores -->
+  <path d="M56 148 Q78 160 96 152 M144 148 Q122 160 104 152 M58 164 Q78 175 96 168 M142 164 Q122 175 104 168 M62 180 Q80 190 96 184 M138 180 Q120 190 104 184" fill="none" stroke="#434c58" stroke-width=".6"/>
+  <text x="100" y="256" text-anchor="middle" font-size="10" fill="#cbd3dd" font-family="system-ui">COSTAS</text></g>`}; return T[view]; }
 function drawTorso(){
-  const s=$('torso'); const post=mode===0&&view==='post';
-  s.innerHTML=`<path d="M60 20 Q100 5 140 20 L160 60 L158 220 L42 220 L40 60 Z" fill="#1f252e" stroke="#3a4350"/><line x1="100" y1="30" x2="100" y2="190" stroke="#3a4350" stroke-dasharray="3 3"/>`+
-  (post?`<path d="M62 70 L85 65 L92 120 L70 125 Z M138 70 L115 65 L108 120 L130 125 Z" fill="none" stroke="#2c343f"/><text x="100" y="232" class="site-lbl" font-size="8">VISTA POSTERIOR (D do paciente à esquerda da tela)</text>`
-       :`<path d="M70 60 Q100 75 130 60 M66 85 Q100 100 134 85 M64 110 Q100 125 136 110 M64 135 Q100 150 136 135" fill="none" stroke="#2c343f"/><text x="100" y="232" class="site-lbl" font-size="8">VISTA ANTERIOR (D do paciente à esquerda da tela)</text>`);
-  for(const p of sitesNow()){
-    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
-    c.setAttribute('cx',p.x);c.setAttribute('cy',p.y);c.setAttribute('r',9);
-    c.setAttribute('class','site'+(mode?' hr':'')+(site&&site.id===p.id?' sel':''));
-    c.onclick=()=>{site=p;drawTorso();}; s.appendChild(c);
-    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
-    t.setAttribute('x',p.x);t.setAttribute('y',p.y+18);t.setAttribute('class','site-lbl');t.textContent=p.n.split(' (')[0]; s.appendChild(t);
-  }
-  $('siteName').textContent=site?site.n:'não definida';
-  $('bView').style.display=mode===0?'inline-block':'none'; $('bView').textContent=post?'Ver anterior':'Ver posterior';
+  const s=$('torso');
+  let h=`<defs><radialGradient id="sk" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#3a4452"/><stop offset=".6" stop-color="#262d37"/><stop offset="1" stop-color="#171c23"/></radialGradient></defs>`;
+  const has=v=>SITES[mode].some(p=>p.view===v); h+=torsoSVG('ant',0,!has('ant'))+torsoSVG('post',210,!has('post'));
+  s.innerHTML=h;
+  SITES[mode].forEach((p,i)=>{
+    const ox=p.view==='ant'?0:210, sel=site&&site.id===p.id, col=mode?'#ff6b6b':'#3fb8ff';
+    const gg=document.createElementNS('http://www.w3.org/2000/svg','g'); gg.setAttribute('transform',`translate(${ox},0)`); gg.style.cursor='pointer';
+    gg.innerHTML=`<circle cx="${p.x}" cy="${p.y}" r="${sel?15:11}" fill="${col}" opacity="${sel?.28:.15}"/>
+      <circle cx="${p.x}" cy="${p.y}" r="7" fill="${sel?col:'#2a323d'}" stroke="${sel?'#fff':col}" stroke-width="1.6"/>
+      <text x="${p.x}" y="${p.y+3.5}" text-anchor="middle" font-size="9" font-weight="700" fill="${sel?'#000':'#fff'}">${i+1}</text>`;
+    gg.onclick=()=>{site=p;drawTorso();}; s.appendChild(gg);
+  });
+  $('siteName').textContent=site?site.n:'toque em um ponto';
+  $('siteInstr').textContent=(site?site.instr:'Selecione a posição no diagrama ou no pop-up de medição.')+' (Frente: direita do paciente à esquerda da tela. Costas: direita do paciente à direita da tela.)';
 }
-
 /* -------------------------- estado ----------------------------------------- */
 let mode=0, dev=null, connected=false, simTimer=null;
 let lastSeq=null, lost=0, pkts=0, samples=0, t0=performance.now(), clipCnt=0;
@@ -304,17 +341,16 @@ function setMode(m){
   $('xLbl').textContent=m?'Regularidade do ritmo':'Razão I:E'; $('xUnit').textContent=m?'100 % = intervalos iguais':'insp : exp (normal ≈ 1:2)';
 }
 $('selFs').onchange=e=>{ FS=+e.target.value; buildFilters(); specReset(); resetSignal(); wave.fill(0); if(simTimer){stopSim();startSim();} };
-$('bView').onclick=()=>{view=view==='ant'?'post':'ant';drawTorso();};
 $('bResp').onclick=()=>setMode(0); $('bHr').onclick=()=>setMode(1);
 
 /* -------------------------- diálogo de medição ----------------------------- */
-function fillSites(m){ $('dSite').innerHTML=allSites(m).map(p=>`<option value="${p.id}" ${site&&site.id===p.id?'selected':''}>${p.n}</option>`).join(''); }
+function fillSites(m){ $('dSite').innerHTML=allSites(m).map((p,i)=>`<option value="${p.id}" ${site&&site.id===p.id?'selected':''}>${i+1}. ${p.n}</option>`).join(''); }
 $('bStart').onclick=()=>{ if(session){stopSession();return;} $('dMode').value=mode; fillSites(mode); $('ovl').classList.add('show'); };
 $('dMode').onchange=e=>fillSites(+e.target.value);
 $('dCancel').onclick=()=>$('ovl').classList.remove('show');
 $('dGo').onclick=()=>{
   const m=+$('dMode').value; if(m!==mode) setMode(m);
-  site=allSites(mode).find(p=>p.id===$('dSite').value)||null; if(site&&mode===0) view=site.id.startsWith('p_')?'post':'ant'; drawTorso();
+  site=allSites(mode).find(p=>p.id===$('dSite').value)||null; drawTorso();
   $('ovl').classList.remove('show');
   if(!simTimer&&!connected){ st('Conecte ao ESP ou ative a simulação antes de medir.'); return; }
   startSession(+$('dDur').value,$('dNote').value);
