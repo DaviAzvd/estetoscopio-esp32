@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ausculta ESP32-C3</title>
+<style>
+  :root{--bg:#0f1216;--card:#181d24;--fg:#e8ecf1;--mut:#8a94a3;--acc:#3fb8ff;--acc2:#ff6b6b;--ok:#4cd964;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif}
+  header{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid #262c35;flex-wrap:wrap}
+  h1{font-size:17px;margin:0 auto 0 0}
+  button,select{background:#232a34;color:var(--fg);border:1px solid #333b47;border-radius:8px;padding:10px 14px;font-size:15px;cursor:pointer}
+  button.on{background:var(--acc);color:#000;border-color:var(--acc)}
+  button.hr.on{background:var(--acc2);border-color:var(--acc2)}
+  button.go{background:var(--ok);color:#000;border-color:var(--ok);font-weight:600}
+  button.stop{background:var(--acc2);color:#000;border-color:var(--acc2);font-weight:600}
+  main{padding:12px;display:grid;gap:12px;grid-template-columns:1fr 1fr 1fr}
+  .card{background:var(--card);border-radius:12px;padding:12px;min-width:0}
+  .big{font-size:56px;font-weight:700;line-height:1}
+  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
+  .wide{grid-column:1/-1}
+  canvas{width:100%;display:block;background:#0c0f13;border-radius:8px}
+  #wave,#env{height:150px} #spec{height:190px}
+  #status{color:var(--mut);font-size:13px;width:100%}
+  svg{width:100%;max-height:260px;display:block}
+  .site{fill:#2a323d;stroke:#4a5563;stroke-width:1.5;cursor:pointer}
+  .site.sel{fill:var(--acc);stroke:#fff}
+  .site.hr.sel{fill:var(--acc2)}
+  .site-lbl{fill:#cbd3dd;font-size:7px;pointer-events:none;text-anchor:middle}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  td,th{padding:5px 6px;border-bottom:1px solid #262c35;text-align:left;white-space:nowrap}
+  th{color:var(--mut);font-weight:500}
+  #ovl{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:9}
+  #ovl.show{display:flex}
+  .dlg{background:var(--card);border-radius:14px;padding:18px;width:min(420px,92vw);display:grid;gap:12px}
+  .dlg label{display:grid;gap:4px;font-size:13px;color:var(--mut)}
+  .dlg input,.dlg select{background:#0c0f13;color:var(--fg);border:1px solid #333b47;border-radius:8px;padding:9px;font-size:15px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  #rec{display:none;color:var(--ok);font-weight:600}
+  .sm{padding:5px 9px;font-size:13px}
+  @media(max-width:800px){main{grid-template-columns:1fr 1fr}}
+  @media(max-width:520px){main{grid-template-columns:1fr}.big{font-size:44px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Ausculta ESP32-C3</h1>
+  <span id="rec">● GRAVANDO <span id="cnt"></span></span>
+  <button id="bResp" class="on">Respiração</button>
+  <button id="bHr" class="hr">Batimento</button>
+  <select id="selFs" title="Taxa de amostragem do ADC no ESP"><option value="2000">ADC 2 kHz</option><option value="4000" selected>ADC 4 kHz</option><option value="8000">ADC 8 kHz</option></select>
+  <button id="bSim">Simular</button>
+  <button id="bConn">Conectar BLE</button>
+  <button id="bStart" class="go">Iniciar medição</button>
+  <div id="status">Desconectado.</div>
+</header>
+<main>
+  <div class="card"><div class="lbl">Intensidade (RMS, banda do modo)</div><div class="big" id="rms">—</div><div class="lbl" id="rmsdb"></div></div>
+  <div class="card"><div class="lbl" id="rateLbl">Freq. respiratória</div><div class="big" id="rate">—</div><div class="lbl" id="rateUnit">rpm</div></div>
+  <div class="card"><div class="lbl" id="xLbl">Razão I:E</div><div class="big" id="xVal">—</div><div class="lbl" id="xUnit">insp : exp</div></div>
+
+  <div class="card" style="grid-row:span 2">
+    <div class="row" style="justify-content:space-between"><div class="lbl">Posição — <span id="siteName">não definida</span></div><button id="bView" class="sm">Ver posterior</button></div>
+    <svg id="torso" viewBox="0 0 200 240"></svg>
+  </div>
+  <div class="card wide" style="grid-column:2/-1"><div class="lbl">Fonocardiograma filtrado — <span id="bandLbl"></span> (últimos 4 s)</div><canvas id="wave"></canvas></div>
+  <div class="card wide" style="grid-column:2/-1"><div class="lbl">Espectrograma do sinal bruto (0–<span id="fmax"></span> Hz, últimos 8 s; linhas = banda do modo)</div><canvas id="spec"></canvas></div>
+
+  <div class="card wide"><div class="lbl">Envelope / intensidade (últimos 20 s) — marcas = eventos detectados</div><canvas id="env"></canvas></div>
+  <div class="card wide"><div class="lbl">Conexão / sinal</div><div id="stats" style="font-size:13px;color:var(--mut)">—</div></div>
+  <div class="card wide">
+    <div class="row" style="justify-content:space-between"><div class="lbl">Sessões gravadas</div><div class="row"><button id="bCsv" class="sm">Exportar CSV</button><button id="bWav" class="sm">Exportar WAV (última)</button><button id="bClr" class="sm">Limpar</button></div></div>
+    <table><thead><tr><th>#</th><th>Hora</th><th>Modo</th><th>Posição</th><th>Dur.</th><th>RMS méd.</th><th>Freq.</th><th>Regular.</th><th>I:E</th><th>Obs.</th></tr></thead><tbody id="sess"></tbody></table>
+  </div>
+</main>
+
+<div id="ovl"><div class="dlg">
+  <div style="font-size:18px;font-weight:600">Nova medição</div>
+  <label>Modo<select id="dMode"><option value="0">Respiração</option><option value="1">Batimento cardíaco</option></select></label>
+  <label>Posição<select id="dSite"></select></label>
+  <label>Duração (s)<select id="dDur"><option>15</option><option selected>30</option><option>60</option><option>120</option></select></label>
+  <label>Identificação / observação<input id="dNote" placeholder="opcional"></label>
+  <div class="row" style="justify-content:flex-end"><button id="dCancel">Cancelar</button><button id="dGo" class="go">Iniciar</button></div>
+</div></div>
+
+<script>
+/* ===================== PROTOCOLO MÍNIMO (firmware só amostra e envia) ========
+   Serviço BLE : 0000ff00-0000-1000-8000-00805f9b34fb
+   DATA (Notify): 0000ff01-0000-1000-8000-00805f9b34fb
+      [0..1]  seq   uint16 LE   contador de pacotes (detecção de perda)
+      [2..]   N x uint16 LE     valores crus do ADC (0..4095), N = (len-2)/2
+   Taxa de amostragem fixa no firmware; selecione a mesma no menu "ADC".
+   Sugestão: 4 kHz, MTU 247 -> 120 amostras/pacote -> ~33 pacotes/s.
+   Nenhum filtro, nenhum modo, nenhum RMS no ESP: tudo é feito aqui.
+   ============================================================================ */
+const SVC='0000ff00-0000-1000-8000-00805f9b34fb', CH_DATA='0000ff01-0000-1000-8000-00805f9b34fb';
+let FS=4000;                       // Hz (menu)
+const ENV_HZ=50, DISP_FS=1000;     // envelope a 50 Hz; onda exibida a 1 kHz
+const BANDS={0:{hp:100,lp:1000,n:'100–1000 Hz'},1:{hp:20,lp:150,n:'20–150 Hz'}};
+
+/* -------------------------- DSP: biquads (RBJ) ----------------------------- */
+class Biquad{
+  constructor(type,f,fs,q=0.7071){ this.set(type,f,fs,q); this.z1=0; this.z2=0; }
+  set(type,f,fs,q){ const w=2*Math.PI*f/fs, c=Math.cos(w), s=Math.sin(w), a=s/(2*q); let b0,b1,b2,a0,a1,a2;
+    if(type==='lp'){ b0=(1-c)/2; b1=1-c; b2=(1-c)/2; } else { b0=(1+c)/2; b1=-(1+c); b2=(1+c)/2; }
+    a0=1+a; a1=-2*c; a2=1-a; this.b0=b0/a0; this.b1=b1/a0; this.b2=b2/a0; this.a1=a1/a0; this.a2=a2/a0; }
+  p(x){ const y=this.b0*x+this.z1; this.z1=this.b1*x-this.a1*y+this.z2; this.z2=this.b2*x-this.a2*y; return y; }
+}
+let chain=[], dcBlk=null;
+function buildFilters(){
+  const b=BANDS[mode]; const fl=Math.min(b.lp,FS*0.45);
+  chain=[new Biquad('hp',b.hp,FS,0.54),new Biquad('hp',b.hp,FS,1.31),   // 4ª ordem Butterworth (2 biquads)
+         new Biquad('lp',fl,FS,0.54),new Biquad('lp',fl,FS,1.31)];
+  dcBlk=new Biquad('hp',5,FS);
+  $('bandLbl').textContent=b.n; $('fmax').textContent=FS/2;
+}
+
+/* -------------------------- posições anatômicas ---------------------------- */
+const SITES={
+ 0:{ant:[{id:'a_apD',n:'Ápice direito (ant.)',x:72,y:62},{id:'a_apE',n:'Ápice esquerdo (ant.)',x:128,y:62},
+        {id:'a_mdD',n:'Campo médio direito (ant.)',x:62,y:100},{id:'a_mdE',n:'Campo médio esquerdo (ant.)',x:138,y:100},
+        {id:'a_bsD',n:'Base direita (ant.)',x:66,y:140},{id:'a_bsE',n:'Base esquerda (ant.)',x:134,y:140}],
+    post:[{id:'p_apD',n:'Ápice direito (post.)',x:72,y:55},{id:'p_apE',n:'Ápice esquerdo (post.)',x:128,y:55},
+        {id:'p_ieD',n:'Interescapular direito',x:78,y:100},{id:'p_ieE',n:'Interescapular esquerdo',x:122,y:100},
+        {id:'p_bsD',n:'Base direita (post.)',x:68,y:150},{id:'p_bsE',n:'Base esquerda (post.)',x:132,y:150}]},
+ 1:{ant:[{id:'ao',n:'Foco aórtico (2º EIC D)',x:88,y:78},{id:'pu',n:'Foco pulmonar (2º EIC E)',x:112,y:78},
+        {id:'erb',n:'Ponto de Erb (3º EIC E)',x:110,y:95},{id:'tr',n:'Foco tricúspide (4º EIC E)',x:108,y:112},
+        {id:'mi',n:'Foco mitral (5º EIC, LHC)',x:128,y:128}]}
+};
+let view='ant', site=null;
+const sitesNow=()=>SITES[mode][view]||SITES[mode].ant;
+const allSites=m=>Object.values(SITES[m]).flat();
+function drawTorso(){
+  const s=$('torso'); const post=mode===0&&view==='post';
+  s.innerHTML=`<path d="M60 20 Q100 5 140 20 L160 60 L158 220 L42 220 L40 60 Z" fill="#1f252e" stroke="#3a4350"/><line x1="100" y1="30" x2="100" y2="190" stroke="#3a4350" stroke-dasharray="3 3"/>`+
+  (post?`<path d="M62 70 L85 65 L92 120 L70 125 Z M138 70 L115 65 L108 120 L130 125 Z" fill="none" stroke="#2c343f"/><text x="100" y="232" class="site-lbl" font-size="8">VISTA POSTERIOR (D do paciente à esquerda da tela)</text>`
+       :`<path d="M70 60 Q100 75 130 60 M66 85 Q100 100 134 85 M64 110 Q100 125 136 110 M64 135 Q100 150 136 135" fill="none" stroke="#2c343f"/><text x="100" y="232" class="site-lbl" font-size="8">VISTA ANTERIOR (D do paciente à esquerda da tela)</text>`);
+  for(const p of sitesNow()){
+    const c=document.createElementNS('http://www.w3.org/2000/svg','circle');
+    c.setAttribute('cx',p.x);c.setAttribute('cy',p.y);c.setAttribute('r',9);
+    c.setAttribute('class','site'+(mode?' hr':'')+(site&&site.id===p.id?' sel':''));
+    c.onclick=()=>{site=p;drawTorso();}; s.appendChild(c);
+    const t=document.createElementNS('http://www.w3.org/2000/svg','text');
+    t.setAttribute('x',p.x);t.setAttribute('y',p.y+18);t.setAttribute('class','site-lbl');t.textContent=p.n.split(' (')[0]; s.appendChild(t);
+  }
+  $('siteName').textContent=site?site.n:'não definida';
+  $('bView').style.display=mode===0?'inline-block':'none'; $('bView').textContent=post?'Ver anterior':'Ver posterior';
+}
+
+/* -------------------------- estado ----------------------------------------- */
+let mode=0, dev=null, connected=false, simTimer=null;
+let lastSeq=null, lost=0, pkts=0, samples=0, t0=performance.now(), clipCnt=0;
+const WAVE_N=DISP_FS*4, ENV_N=ENV_HZ*20;
+const wave=new Float32Array(WAVE_N); let wi=0, dispAcc=0;
+const env=new Float32Array(ENV_N); let ei=0;
+let sq=0, sqN=0;                   // acumulador RMS
+const peaks=[];
+const $=id=>document.getElementById(id);
+const st=m=>$('status').textContent=m;
+
+/* -------------------------- FFT / espectrograma ---------------------------- */
+const NFFT=512, HOP=256, K=NFFT/2;
+let SPEC_COLS, spec, sc=0; const fftBuf=new Float32Array(NFFT); let fftFill=0;
+const hann=Float32Array.from({length:NFFT},(_,i)=>0.5-0.5*Math.cos(2*Math.PI*i/NFFT));
+function specReset(){ SPEC_COLS=Math.ceil(8*FS/HOP); spec=new Uint8Array(SPEC_COLS*K); sc=0; fftFill=0; }
+function fft(re,im){ const n=re.length; for(let i=1,j=0;i<n;i++){ let bit=n>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit; if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];} }
+  for(let len=2;len<=n;len<<=1){ const a=-2*Math.PI/len, wr=Math.cos(a), ws=Math.sin(a);
+    for(let i=0;i<n;i+=len){ let cr=1,ci=0; for(let j=0;j<len/2;j++){ const ur=re[i+j],ui=im[i+j], vr=re[i+j+len/2]*cr-im[i+j+len/2]*ci, vi=re[i+j+len/2]*ci+im[i+j+len/2]*cr;
+      re[i+j]=ur+vr;im[i+j]=ui+vi;re[i+j+len/2]=ur-vr;im[i+j+len/2]=ui-vi; const t=cr*wr-ci*ws; ci=cr*ws+ci*wr; cr=t; } } } }
+const re=new Float32Array(NFFT), im=new Float32Array(NFFT);
+function pushSpec(x){
+  fftBuf[fftFill++]=x; if(fftFill<NFFT) return;
+  for(let i=0;i<NFFT;i++){re[i]=fftBuf[i]*hann[i];im[i]=0;} fft(re,im);
+  const base=sc*K;
+  for(let k=0;k<K;k++){ const db=20*Math.log10(Math.hypot(re[k],im[k])+1); spec[base+k]=Math.max(0,Math.min(255,(db-10)*4)); }
+  sc=(sc+1)%SPEC_COLS; fftBuf.copyWithin(0,HOP); fftFill=NFFT-HOP;
+}
+
+/* -------------------------- sessão/gravação -------------------------------- */
+let session=null; const sessions=[];
+function startSession(dur,note){
+  session={t0:performance.now(),dur:dur*1000,note,mode,site:site?site.n:'—',rows:[],rates:[],ints:[],ie:[],raw:[],fs:FS};
+  $('rec').style.display='inline'; $('bStart').textContent='Parar'; $('bStart').className='stop';
+}
+function stopSession(){
+  if(!session) return;
+  const s=session; session=null; $('rec').style.display='none'; $('bStart').textContent='Iniciar medição'; $('bStart').className='go';
+  const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN;
+  const rmsM=mean(s.rows.map(r=>r.rms)), rateM=mean(s.rates);
+  const cv=s.ints.length>2?Math.sqrt(mean(s.ints.map(v=>(v-mean(s.ints))**2)))/mean(s.ints):NaN;
+  const reg=isNaN(cv)?'—':Math.max(0,100-100*cv).toFixed(0)+' %';
+  const ie=s.mode===0&&s.ie.length?'1 : '+(1/mean(s.ie)).toFixed(1):'—';
+  const rec={n:sessions.length+1,time:new Date().toLocaleTimeString(),mode:s.mode?'Batimento':'Respiração',site:s.site,dur:((performance.now()-s.t0)/1000).toFixed(0)+' s',
+             rms:isNaN(rmsM)?'—':rmsM.toFixed(1),rate:isNaN(rateM)?'—':rateM.toFixed(0)+(s.mode?' bpm':' rpm'),reg,ie,note:s.note,rows:s.rows,raw:s.raw,fs:s.fs};
+  sessions.push(rec);
+  $('sess').insertAdjacentHTML('beforeend',`<tr><td>${rec.n}</td><td>${rec.time}</td><td>${rec.mode}</td><td>${rec.site}</td><td>${rec.dur}</td><td>${rec.rms}</td><td>${rec.rate}</td><td>${rec.reg}</td><td>${rec.ie}</td><td>${rec.note||''}</td></tr>`);
+  st(`Sessão ${rec.n} concluída: ${rec.rate}, RMS ${rec.rms}.`);
+}
+function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
+$('bCsv').onclick=()=>{
+  if(!sessions.length){st('Nenhuma sessão.');return;}
+  let csv='sessao;hora;modo;posicao;obs;t_s;rms;freq\n';
+  for(const s of sessions) for(const r of s.rows) csv+=`${s.n};${s.time};${s.mode};${s.site};${s.note||''};${r.t.toFixed(3)};${r.rms.toFixed(1)};${r.rate||''}\n`;
+  download(new Blob([csv],{type:'text/csv'}),'ausculta_'+Date.now()+'.csv');
+};
+$('bWav').onclick=()=>{ // WAV 16 bits mono do sinal bruto (ADC 12 bits centrado), p/ análise em Python/Audacity
+  const s=sessions[sessions.length-1]; if(!s){st('Nenhuma sessão.');return;}
+  const n=s.raw.length, buf=new ArrayBuffer(44+2*n), v=new DataView(buf); const w=(o,str)=>{for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i));};
+  w(0,'RIFF'); v.setUint32(4,36+2*n,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
+  v.setUint32(24,s.fs,true); v.setUint32(28,s.fs*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,2*n,true);
+  for(let i=0;i<n;i++) v.setInt16(44+2*i,(s.raw[i]-2048)*16,true);
+  download(new Blob([buf],{type:'audio/wav'}),`ausculta_s${s.n}_${s.mode}_${s.fs}Hz.wav`);
+};
+$('bClr').onclick=()=>{sessions.length=0;$('sess').innerHTML='';};
+
+/* -------------------------- processamento ---------------------------------- */
+let curRate=null, lastRaw=2048;
+function onPacket(dv){
+  const seq=dv.getUint16(0,true);
+  if(lastSeq!==null){ const d=(seq-lastSeq)&0xffff; if(d>1) lost+=d-1; } lastSeq=seq; pkts++;
+  const n=(dv.byteLength-2)>>1, dec=FS/DISP_FS, winN=FS/ENV_HZ;
+  for(let i=0;i<n;i++){
+    const raw=dv.getUint16(2+2*i,true); samples++; lastRaw=raw; if(raw<=2||raw>=4093) clipCnt++;
+    if(session) session.raw.push(raw);
+    let x=raw-2048;
+    pushSpec(dcBlk.p(x));
+    for(const f of chain) x=f.p(x);           // banda do modo
+    sq+=x*x; sqN++;
+    if(++dispAcc>=dec){ dispAcc=0; wave[wi]=x; wi=(wi+1)%WAVE_N; }
+    if(sqN>=winN){ const rms=Math.sqrt(sq/sqN); sq=0; sqN=0; onEnvelope(rms); }
+  }
+}
+function onEnvelope(rms){
+  const now=performance.now();
+  env[ei]=rms; ei=(ei+1)%ENV_N;
+  detect(rms,now);
+  $('rms').textContent=rms.toFixed(0); $('rmsdb').textContent=rms>0?(20*Math.log10(rms/2048)).toFixed(1)+' dBFS':'';
+  if(session){
+    session.rows.push({t:(now-session.t0)/1000,rms,rate:curRate});
+    if(now-session.t0>=session.dur) stopSession(); else $('cnt').textContent=((session.dur-(now-session.t0))/1000).toFixed(0)+' s';
+  }
+}
+let emaMean=0, emaMax=0, above=false, tUpPrev=0, tDown=0, ieHist=[];
+function detect(v,t){
+  emaMean+=(v-emaMean)*0.02; emaMax=Math.max(v,emaMax*0.995);
+  const thr=emaMean+(mode===1?0.4:0.55)*(emaMax-emaMean), refr=mode===1?300:2500;
+  const lastP=peaks.length?peaks[peaks.length-1]:-1e9;
+  if(!above&&v>thr&&t-lastP>refr){ above=true; peaks.push(t); if(peaks.length>12) peaks.shift();
+    if(mode===0&&tDown>0){ const tIn=tDown-tUpPrev, tEx=t-tDown; if(tIn>200&&tEx>200){ ieHist.push(tIn/tEx); if(ieHist.length>6) ieHist.shift(); if(session) session.ie.push(tIn/tEx);} } tUpPrev=t; }
+  if(above&&v<thr*0.8){ above=false; tDown=t; }
+  if(peaks.length>=3){
+    const iv=[]; for(let i=1;i<peaks.length;i++) iv.push(peaks[i]-peaks[i-1]);
+    const med=[...iv].sort((a,b)=>a-b)[iv.length>>1]; curRate=Math.round(60000/med); $('rate').textContent=curRate;
+    if(session){ session.rates.push(curRate); session.ints.push(iv[iv.length-1]); }
+    if(mode===1){ const m=iv.reduce((a,b)=>a+b,0)/iv.length, cv=Math.sqrt(iv.reduce((a,b)=>a+(b-m)**2,0)/iv.length)/m; $('xVal').textContent=Math.max(0,100-100*cv).toFixed(0)+' %'; }
+  }
+  if(mode===0&&ieHist.length){ const m=ieHist.reduce((a,b)=>a+b,0)/ieHist.length; $('xVal').textContent='1 : '+(1/m).toFixed(1); }
+}
+
+/* -------------------------- desenho ---------------------------------------- */
+function fit(c){ const r=c.getBoundingClientRect(); const w=Math.round(r.width*devicePixelRatio),h=Math.round(r.height*devicePixelRatio); if(c.width!==w||c.height!==h){c.width=w;c.height=h;} }
+function drawWave(){
+  const c=$('wave'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height;
+  g.clearRect(0,0,W,H); let mx=1; for(let i=0;i<WAVE_N;i++) mx=Math.max(mx,Math.abs(wave[i]));
+  g.strokeStyle=mode?'#ff6b6b':'#3fb8ff'; g.lineWidth=1.5*devicePixelRatio; g.beginPath();
+  const step=Math.max(1,Math.floor(WAVE_N/W));
+  for(let i=0,x=0;i<WAVE_N;i+=step,x+=step*W/WAVE_N){ const y=H/2-wave[(wi+i)%WAVE_N]/mx*H*0.45; i?g.lineTo(x,y):g.moveTo(x,y); }
+  g.stroke();
+}
+let specImg=null;
+function drawSpec(){
+  const c=$('spec'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height;
+  if(!specImg||specImg.width!==SPEC_COLS) specImg=new ImageData(SPEC_COLS,K);
+  const d=specImg.data;
+  for(let x=0;x<SPEC_COLS;x++){ const col=(sc+x)%SPEC_COLS;
+    for(let k=0;k<K;k++){ const v=spec[col*K+k], p=4*((K-1-k)*SPEC_COLS+x); d[p]=Math.min(255,v*2); d[p+1]=Math.max(0,v*2-200); d[p+2]=Math.max(0,120-v); d[p+3]=255; } }
+  createImageBitmap(specImg).then(b=>{ g.imageSmoothingEnabled=false; g.clearRect(0,0,W,H); g.drawImage(b,0,0,W,H); b.close();
+    const bd=BANDS[mode]; g.strokeStyle='#ffffff88'; g.setLineDash([4,4]); g.lineWidth=devicePixelRatio;
+    for(const f of [bd.hp,bd.lp]){ const y=H-f/(FS/2)*H; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); } g.setLineDash([]); });
+}
+function drawEnv(){
+  const c=$('env'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height;
+  g.clearRect(0,0,W,H); let mx=1; for(let i=0;i<ENV_N;i++) mx=Math.max(mx,env[i]);
+  g.strokeStyle='#ffd166'; g.lineWidth=2*devicePixelRatio; g.beginPath();
+  for(let i=0;i<ENV_N;i++){ const x=i*W/ENV_N, y=H-env[(ei+i)%ENV_N]/mx*H*0.9; i?g.lineTo(x,y):g.moveTo(x,y); }
+  g.stroke();
+  const now=performance.now(); g.fillStyle='#fff';
+  for(const p of peaks){ const age=now-p; if(age<20000) g.fillRect(W-age/20000*W-1,0,2*devicePixelRatio,H*0.08); }
+}
+let frame=0;
+function loop(){ drawWave(); drawEnv(); if(frame++%3===0) drawSpec();
+  const el=(performance.now()-t0)/1000;
+  $('stats').textContent=`pacotes: ${pkts} | perdidos: ${lost} | ${(pkts/el).toFixed(1)} pkt/s | ${(samples/el).toFixed(0)} amostras/s (esperado ${FS}) | ADC atual: ${lastRaw} | saturações: ${clipCnt}`;
+  requestAnimationFrame(loop); }
+requestAnimationFrame(loop);
+
+/* -------------------------- modo / taxa ------------------------------------ */
+function resetSignal(){ peaks.length=0; ieHist.length=0; curRate=null; emaMean=0; emaMax=0; above=false; tDown=0; sq=0; sqN=0; $('rate').textContent='—'; $('xVal').textContent='—'; }
+function setMode(m){
+  mode=m; site=null; buildFilters(); drawTorso(); resetSignal();
+  $('bResp').classList.toggle('on',m===0); $('bHr').classList.toggle('on',m===1);
+  $('rateLbl').textContent=m?'Freq. cardíaca':'Freq. respiratória'; $('rateUnit').textContent=m?'bpm':'rpm';
+  $('xLbl').textContent=m?'Regularidade do ritmo':'Razão I:E'; $('xUnit').textContent=m?'100 % = intervalos iguais':'insp : exp (normal ≈ 1:2)';
+}
+$('selFs').onchange=e=>{ FS=+e.target.value; buildFilters(); specReset(); resetSignal(); wave.fill(0); if(simTimer){stopSim();startSim();} };
+$('bView').onclick=()=>{view=view==='ant'?'post':'ant';drawTorso();};
+$('bResp').onclick=()=>setMode(0); $('bHr').onclick=()=>setMode(1);
+
+/* -------------------------- diálogo de medição ----------------------------- */
+function fillSites(m){ $('dSite').innerHTML=allSites(m).map(p=>`<option value="${p.id}" ${site&&site.id===p.id?'selected':''}>${p.n}</option>`).join(''); }
+$('bStart').onclick=()=>{ if(session){stopSession();return;} $('dMode').value=mode; fillSites(mode); $('ovl').classList.add('show'); };
+$('dMode').onchange=e=>fillSites(+e.target.value);
+$('dCancel').onclick=()=>$('ovl').classList.remove('show');
+$('dGo').onclick=()=>{
+  const m=+$('dMode').value; if(m!==mode) setMode(m);
+  site=allSites(mode).find(p=>p.id===$('dSite').value)||null; if(site&&mode===0) view=site.id.startsWith('p_')?'post':'ant'; drawTorso();
+  $('ovl').classList.remove('show');
+  if(!simTimer&&!connected){ st('Conecte ao ESP ou ative a simulação antes de medir.'); return; }
+  startSession(+$('dDur').value,$('dNote').value);
+};
+
+/* -------------------------- BLE -------------------------------------------- */
+$('bConn').onclick=async()=>{
+  if(!navigator.bluetooth){ st('Web Bluetooth indisponível. Use o Chrome no Android.'); return; }
+  try{
+    stopSim(); st('Procurando...');
+    dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}],optionalServices:[SVC]});
+    dev.addEventListener('gattserverdisconnected',()=>{st('Desconectado.');connected=false;});
+    const srv=await (await dev.gatt.connect()).getPrimaryService(SVC);
+    const ch=await srv.getCharacteristic(CH_DATA);
+    await ch.startNotifications();
+    ch.addEventListener('characteristicvaluechanged',e=>onPacket(e.target.value));
+    lastSeq=null; lost=0; pkts=0; samples=0; clipCnt=0; t0=performance.now(); resetSignal(); connected=true;
+    st('Conectado a '+(dev.name||'ESP32')+' — confira "amostras/s" com a taxa escolhida no menu ADC.');
+  }catch(e){ st('Erro: '+e.message); }
+};
+
+/* -------------------------- simulação (ADC cru: coração + pulmão + ruído) --- */
+function startSim(){
+  let seq=0, t=0, nz=0; const N=Math.round(FS/33), PK=1000/33;
+  simTimer=setInterval(()=>{
+    const buf=new DataView(new ArrayBuffer(2+2*N));
+    for(let i=0;i<N;i++){ t+=1/FS;
+      const ph=(2*Math.PI*1.2*t)%(2*Math.PI);                                   // 72 bpm
+      const eh=Math.exp(-8*(ph-0.6)*(ph-0.6))+0.6*Math.exp(-8*(ph-2.2)*(ph-2.2));
+      const heart=eh*900*Math.sin(2*Math.PI*40*t);
+      const pr=(2*Math.PI*0.25*t)%(2*Math.PI);                                  // 15 rpm
+      const er=pr<2.1?Math.sin(pr/2.1*Math.PI):0.55*Math.sin((pr-2.1)/4.18*Math.PI);
+      nz=0.6*nz+(Math.random()*2-1); const lung=er*450*nz;                     // ruído passa-baixa ~ pulmão
+      const v=2048+heart+lung+(Math.random()*2-1)*20;
+      buf.setUint16(2+2*i,Math.max(0,Math.min(4095,v|0)),true); }
+    buf.setUint16(0,seq++&0xffff,true); onPacket(buf);
+  },PK);
+  $('bSim').classList.add('on'); st('Simulação ativa (coração + pulmão sobrepostos; o filtro do modo separa).'); lastSeq=null;lost=0;pkts=0;samples=0;t0=performance.now();
+}
+function stopSim(){ if(simTimer){clearInterval(simTimer);simTimer=null;$('bSim').classList.remove('on');} }
+$('bSim').onclick=()=>simTimer?stopSim():startSim();
+
+specReset(); setMode(0);
+</script>
+</body>
+</html>
