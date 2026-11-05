@@ -10,6 +10,7 @@ Estetoscópio digital experimental: um ESP32-C3 Super Mini amostra o sinal de um
 |---|---|
 | `index.html` | App web (arquivo único). Publicado via GitHub Pages. |
 | `firmware/esp32c3_ausculta.ino` | Firmware mínimo: amostra o ADC e envia por BLE. |
+| `sim/*.wav` | Gravações reais (4 kHz, banda 20–1000 Hz) usadas pelo botão **Simular**. |
 
 ## Como usar o app
 
@@ -51,3 +52,10 @@ Estetoscópio digital experimental: um ESP32-C3 Super Mini amostra o sinal de um
 ## Firmware
 
 Arduino IDE, placa *ESP32C3 Dev Module* (USB CDC On Boot: Enabled), biblioteca **NimBLE-Arduino**. Ajuste `ADC_PIN` e `FS` em `firmware/esp32c3_ausculta.ino`.
+
+## Gravações de simulação (fontes)
+
+- `sim/heart_normal_61bpm.wav` — PhysioNet/CinC Challenge 2016, registro `a0007` (classificado normal). Liu C. et al., "An open access database for the evaluation of heart sound algorithms", *Physiol. Meas.* 37(12), 2016. Dados abertos (PhysioNet, ODC-By).
+- `sim/lung_normal_21rpm.wav` — ICBHI 2017 Respiratory Sound Database, registro `152_1b1_Al_sc_Meditron` (sujeito saudável, campo anterior esquerdo). Rocha B.M. et al., "An open access database for the evaluation of respiratory sound classification algorithms", *Physiol. Meas.* 40(3), 2019. Uso para fins de pesquisa/educação com atribuição.
+
+Ambas reamostradas para 4 kHz e limitadas a 20–1000 Hz para reproduzir o que sai do condicionamento analógico.

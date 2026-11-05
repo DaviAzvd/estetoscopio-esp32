@@ -2,87 +2,107 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#0b0e13">
+<meta name="mobile-web-app-capable" content="yes">
 <title>Ausculta ESP32-C3</title>
 <style>
-  :root{--bg:#0f1216;--card:#181d24;--fg:#e8ecf1;--mut:#8a94a3;--acc:#3fb8ff;--acc2:#ff6b6b;--ok:#4cd964;}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif}
-  header{display:flex;gap:8px;align-items:center;padding:10px 14px;border-bottom:1px solid #262c35;flex-wrap:wrap}
-  h1{font-size:17px;margin:0 auto 0 0}
-  button,select{background:#232a34;color:var(--fg);border:1px solid #333b47;border-radius:8px;padding:10px 14px;font-size:15px;cursor:pointer}
-  button.on{background:var(--acc);color:#000;border-color:var(--acc)}
-  button.hr.on{background:var(--acc2);border-color:var(--acc2)}
-  button.go{background:var(--ok);color:#000;border-color:var(--ok);font-weight:600}
-  button.stop{background:var(--acc2);color:#000;border-color:var(--acc2);font-weight:600}
-  main{padding:12px;display:grid;gap:12px;grid-template-columns:1fr 1fr 1fr}
-  .card{background:var(--card);border-radius:12px;padding:12px;min-width:0}
-  .big{font-size:56px;font-weight:700;line-height:1}
-  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px}
-  .wide{grid-column:1/-1}
-  canvas{width:100%;display:block;background:#0c0f13;border-radius:8px}
-  #wave,#env{height:150px} #spec{height:190px}
-  #status{color:var(--mut);font-size:13px;width:100%}
-  svg{width:100%;max-height:300px;display:block}
-  .site{fill:#2a323d;stroke:#4a5563;stroke-width:1.5;cursor:pointer}
-  .site.sel{fill:var(--acc);stroke:#fff}
-  .site.hr.sel{fill:var(--acc2)}
-  .site-lbl{fill:#cbd3dd;font-size:7px;pointer-events:none;text-anchor:middle}
+  :root{--bg:#0b0e13;--card:#141a22;--card2:#1b222c;--line:#263040;--fg:#eef2f7;--mut:#8b96a7;--resp:#38bdf8;--hr:#fb7185;--ok:#34d399;--warn:#fbbf24;--acc:var(--resp)}
+  body.hr{--acc:var(--hr)}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;background:var(--bg);color:var(--fg);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;font-size:16px}
+  header{position:sticky;top:0;z-index:5;background:linear-gradient(180deg,#0f141b,#0b0e13);border-bottom:1px solid var(--line);padding:10px 14px;display:grid;gap:10px}
+  .top{display:flex;align-items:center;gap:10px}
+  h1{font-size:18px;margin:0;letter-spacing:.01em;flex:1}
+  .pill{display:inline-flex;align-items:center;gap:7px;padding:6px 11px;border-radius:999px;background:var(--card2);border:1px solid var(--line);font-size:13px;color:var(--mut);white-space:nowrap}
+  .pill i{width:9px;height:9px;border-radius:50%;background:#64748b;display:inline-block}
+  .pill.on i{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+  .pill.warn i{background:var(--warn)}
+  .seg{display:flex;background:var(--card2);border:1px solid var(--line);border-radius:12px;padding:3px;gap:3px}
+  .seg button{flex:1;border:0;background:transparent;color:var(--mut);font-size:15px;font-weight:600;padding:11px 8px;border-radius:9px}
+  .seg button.on{background:var(--acc);color:#0b0e13}
+  .bar{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+  button,select{background:var(--card2);color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:11px 14px;font-size:15px;cursor:pointer;font-family:inherit}
+  button.go{background:var(--ok);color:#0b0e13;border-color:var(--ok);font-weight:700;flex:1}
+  button.stop{background:var(--hr);color:#0b0e13;border-color:var(--hr);font-weight:700;flex:1}
+  button.sim.on{background:var(--warn);color:#0b0e13;border-color:var(--warn)}
+  main{padding:12px;display:grid;gap:12px;grid-template-columns:repeat(12,1fr);max-width:1300px;margin:0 auto}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;min-width:0}
+  .c4{grid-column:span 4}.c6{grid-column:span 6}.c8{grid-column:span 8}.c12{grid-column:span 12}
+  .lbl{color:var(--mut);font-size:12px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;font-weight:600}
+  .big{font-size:58px;font-weight:800;line-height:1;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .unit{color:var(--mut);font-size:13px;margin-top:4px}
+  canvas{width:100%;display:block;background:#0a0d12;border-radius:10px;border:1px solid #1d2531}
+  #wave,#env{height:150px}#spec{height:200px}
+  svg{width:100%;display:block}
+  .torsoWrap{background:radial-gradient(ellipse at 50% 30%,#1e2733,#0f141b 70%);border-radius:12px;padding:6px;border:1px solid #1d2531}
+  .instr{font-size:14px;color:#d5dbe3;line-height:1.5;margin-top:10px;padding:10px 12px;background:var(--card2);border-radius:10px;border-left:3px solid var(--acc)}
+  .instr b{color:var(--fg)}
   table{width:100%;border-collapse:collapse;font-size:13px}
-  td,th{padding:5px 6px;border-bottom:1px solid #262c35;text-align:left;white-space:nowrap}
-  th{color:var(--mut);font-weight:500}
-  #ovl{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center;z-index:9}
+  td,th{padding:7px 8px;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+  th{color:var(--mut);font-weight:600}
+  .tbl{overflow:auto}
+  #ovl{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:9;padding:12px}
   #ovl.show{display:flex}
-  .dlg{background:var(--card);border-radius:14px;padding:18px;width:min(420px,92vw);display:grid;gap:12px}
-  .dlg label{display:grid;gap:4px;font-size:13px;color:var(--mut)}
-  .dlg input,.dlg select{background:#0c0f13;color:var(--fg);border:1px solid #333b47;border-radius:8px;padding:9px;font-size:15px}
+  .dlg{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:20px;width:min(440px,100%);display:grid;gap:14px}
+  .dlg label{display:grid;gap:6px;font-size:13px;color:var(--mut)}
+  .dlg input,.dlg select{background:#0a0d12;color:var(--fg);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:16px;font-family:inherit}
   .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-  #rec{display:none;color:var(--ok);font-weight:600}
-  .sm{padding:5px 9px;font-size:13px}
-  @media(max-width:800px){main{grid-template-columns:1fr 1fr}}
-  @media(max-width:520px){main{grid-template-columns:1fr}.big{font-size:44px}}
+  .sm{padding:7px 11px;font-size:13px}
+  #rec{display:none;color:var(--ok);font-weight:700;font-variant-numeric:tabular-nums}
+  #msg{font-size:13px;color:var(--mut)}
+  @media(max-width:900px){.c4{grid-column:span 6}.c8{grid-column:span 12}.c6{grid-column:span 12}}
+  @media(max-width:560px){.c4{grid-column:span 12}.big{font-size:48px}header{padding:8px 10px}main{padding:10px}}
 </style>
 </head>
 <body>
 <header>
-  <h1>Ausculta ESP32-C3</h1>
-  <span id="rec">● GRAVANDO <span id="cnt"></span></span>
-  <button id="bResp" class="on">Respiração</button>
-  <button id="bHr" class="hr">Batimento</button>
-  <select id="selFs" title="Taxa de amostragem do ADC no ESP"><option value="2000">ADC 2 kHz</option><option value="4000" selected>ADC 4 kHz</option><option value="8000">ADC 8 kHz</option></select>
-  <button id="bSim">Simular</button>
-  <button id="bConn">Conectar BLE</button>
-  <button id="bStart" class="go">Iniciar medição</button>
-  <div id="status">Desconectado.</div>
+  <div class="top">
+    <h1>Ausculta ESP32‑C3</h1>
+    <span id="rec">● <span id="cnt"></span></span>
+    <span class="pill" id="pill"><i></i><span id="pillTxt">Desconectado</span></span>
+  </div>
+  <div class="seg"><button id="bResp" class="on">Respiração</button><button id="bHr">Batimento</button></div>
+  <div class="bar">
+    <select id="selFs" title="Taxa de amostragem do ADC no ESP"><option value="2000">ADC 2 kHz</option><option value="4000" selected>ADC 4 kHz</option><option value="8000">ADC 8 kHz</option></select>
+    <button id="bSim" class="sim">Simular</button>
+    <button id="bConn">Conectar BLE</button>
+    <button id="bStart" class="go">Iniciar medição</button>
+  </div>
+  <div id="msg">Conecte ao ESP ou use a simulação (gravações reais de ausculta).</div>
 </header>
+
 <main>
-  <div class="card"><div class="lbl">Intensidade (RMS, banda do modo)</div><div class="big" id="rms">—</div><div class="lbl" id="rmsdb"></div></div>
-  <div class="card"><div class="lbl" id="rateLbl">Freq. respiratória</div><div class="big" id="rate">—</div><div class="lbl" id="rateUnit">rpm</div></div>
-  <div class="card"><div class="lbl" id="xLbl">Razão I:E</div><div class="big" id="xVal">—</div><div class="lbl" id="xUnit">insp : exp</div></div>
+  <div class="card c4"><div class="lbl">Intensidade (RMS na banda)</div><div class="big" id="rms">—</div><div class="unit" id="rmsdb">&nbsp;</div></div>
+  <div class="card c4"><div class="lbl" id="rateLbl">Freq. respiratória</div><div class="big" id="rate">—</div><div class="unit" id="rateUnit">rpm</div></div>
+  <div class="card c4"><div class="lbl" id="xLbl">Razão I:E</div><div class="big" id="xVal">—</div><div class="unit" id="xUnit">insp : exp</div></div>
 
-  <div class="card" style="grid-row:span 2">
-    <div class="lbl">Posição do microfone — <span id="siteName">toque em um ponto</span></div>
-    <svg id="torso" viewBox="0 0 410 262"></svg>
-    <div id="siteInstr" style="font-size:13px;color:#cbd3dd;margin-top:8px;line-height:1.4"></div>
+  <div class="card c6">
+    <div class="lbl">Posição do microfone — <span id="siteName" style="color:var(--fg)">toque em um ponto</span></div>
+    <div class="torsoWrap"><svg id="torso" viewBox="0 0 420 300"></svg></div>
+    <div id="siteInstr" class="instr"></div>
   </div>
-  <div class="card wide" style="grid-column:2/-1"><div class="lbl">Fonocardiograma filtrado — <span id="bandLbl"></span> (últimos 4 s)</div><canvas id="wave"></canvas></div>
-  <div class="card wide" style="grid-column:2/-1"><div class="lbl">Espectrograma do sinal bruto (0–<span id="fmax"></span> Hz, últimos 8 s; linhas = banda do modo)</div><canvas id="spec"></canvas></div>
+  <div class="card c6">
+    <div class="lbl">Fonocardiograma filtrado — <span id="bandLbl"></span> · últimos 4 s</div><canvas id="wave"></canvas>
+    <div class="lbl" style="margin-top:12px">Envelope · últimos 20 s · marcas = eventos</div><canvas id="env"></canvas>
+  </div>
 
-  <div class="card wide"><div class="lbl">Envelope / intensidade (últimos 20 s) — marcas = eventos detectados</div><canvas id="env"></canvas></div>
-  <div class="card wide"><div class="lbl">Conexão / sinal</div><div id="stats" style="font-size:13px;color:var(--mut)">—</div></div>
-  <div class="card wide">
-    <div class="row" style="justify-content:space-between"><div class="lbl">Sessões gravadas</div><div class="row"><button id="bCsv" class="sm">Exportar CSV</button><button id="bWav" class="sm">Exportar WAV (última)</button><button id="bClr" class="sm">Limpar</button></div></div>
-    <table><thead><tr><th>#</th><th>Hora</th><th>Modo</th><th>Posição</th><th>Dur.</th><th>RMS méd.</th><th>Freq.</th><th>Regular.</th><th>I:E</th><th>Obs.</th></tr></thead><tbody id="sess"></tbody></table>
+  <div class="card c12"><div class="lbl">Espectrograma do sinal bruto · 0–<span id="fmax"></span> Hz · últimos 8 s · linhas tracejadas = banda do modo</div><canvas id="spec"></canvas></div>
+  <div class="card c12"><div class="lbl">Link / sinal</div><div id="stats" style="font-size:13px;color:var(--mut);font-variant-numeric:tabular-nums">—</div></div>
+  <div class="card c12">
+    <div class="row" style="justify-content:space-between;margin-bottom:6px"><div class="lbl" style="margin:0">Sessões gravadas</div><div class="row"><button id="bCsv" class="sm">CSV</button><button id="bWav" class="sm">WAV (última)</button><button id="bClr" class="sm">Limpar</button></div></div>
+    <div class="tbl"><table><thead><tr><th>#</th><th>Hora</th><th>Modo</th><th>Posição</th><th>Dur.</th><th>RMS</th><th>Freq.</th><th>Regular.</th><th>I:E</th><th>Obs.</th></tr></thead><tbody id="sess"></tbody></table></div>
   </div>
+  <div class="card c12" style="font-size:12px;color:var(--mut)">Projeto acadêmico (Eng. Elétrica, UFMG). Não é dispositivo médico; não usar para diagnóstico. Sons de simulação: PhysioNet/CinC 2016 (coração, reg. a0007) e ICBHI 2017 Respiratory Sound Database (pulmão, sujeito 152).</div>
 </main>
 
 <div id="ovl"><div class="dlg">
-  <div style="font-size:18px;font-weight:600">Nova medição</div>
+  <div style="font-size:19px;font-weight:700">Nova medição</div>
   <label>Modo<select id="dMode"><option value="0">Respiração</option><option value="1">Batimento cardíaco</option></select></label>
   <label>Posição<select id="dSite"></select></label>
-  <label>Duração (s)<select id="dDur"><option>15</option><option selected>30</option><option>60</option><option>120</option></select></label>
+  <label>Duração<select id="dDur"><option value="15">15 s</option><option value="30" selected>30 s</option><option value="60">60 s</option><option value="120">120 s</option></select></label>
   <label>Identificação / observação<input id="dNote" placeholder="opcional"></label>
-  <div class="row" style="justify-content:flex-end"><button id="dCancel">Cancelar</button><button id="dGo" class="go">Iniciar</button></div>
+  <div class="row" style="justify-content:flex-end"><button id="dCancel">Cancelar</button><button id="dGo" class="go" style="flex:0 0 auto;padding:11px 22px">Iniciar</button></div>
 </div></div>
 
 <script>
@@ -92,113 +112,99 @@
       [0..1]  seq   uint16 LE   contador de pacotes (detecção de perda)
       [2..]   N x uint16 LE     valores crus do ADC (0..4095), N = (len-2)/2
    Taxa de amostragem fixa no firmware; selecione a mesma no menu "ADC".
-   Sugestão: 4 kHz, MTU 247 -> 120 amostras/pacote -> ~33 pacotes/s.
-   Nenhum filtro, nenhum modo, nenhum RMS no ESP: tudo é feito aqui.
    ============================================================================ */
 const SVC='0000ff00-0000-1000-8000-00805f9b34fb', CH_DATA='0000ff01-0000-1000-8000-00805f9b34fb';
-let FS=4000;                       // Hz (menu)
-const ENV_HZ=50, DISP_FS=1000;     // envelope a 50 Hz; onda exibida a 1 kHz
+let FS=4000; const ENV_HZ=50, DISP_FS=1000;
 const BANDS={0:{hp:100,lp:1000,n:'100–1000 Hz'},1:{hp:20,lp:150,n:'20–150 Hz'}};
+const SIM_FILES={0:'sim/lung_normal_21rpm.wav',1:'sim/heart_normal_61bpm.wav'};
+const $=id=>document.getElementById(id);
 
-/* -------------------------- DSP: biquads (RBJ) ----------------------------- */
+/* -------------------------- DSP ------------------------------------------- */
 class Biquad{
   constructor(type,f,fs,q=0.7071){ this.set(type,f,fs,q); this.z1=0; this.z2=0; }
-  set(type,f,fs,q){ const w=2*Math.PI*f/fs, c=Math.cos(w), s=Math.sin(w), a=s/(2*q); let b0,b1,b2,a0,a1,a2;
+  set(type,f,fs,q){ const w=2*Math.PI*f/fs, c=Math.cos(w), s=Math.sin(w), a=s/(2*q); let b0,b1,b2;
     if(type==='lp'){ b0=(1-c)/2; b1=1-c; b2=(1-c)/2; } else { b0=(1+c)/2; b1=-(1+c); b2=(1+c)/2; }
-    a0=1+a; a1=-2*c; a2=1-a; this.b0=b0/a0; this.b1=b1/a0; this.b2=b2/a0; this.a1=a1/a0; this.a2=a2/a0; }
+    const a0=1+a; this.b0=b0/a0; this.b1=b1/a0; this.b2=b2/a0; this.a1=-2*c/a0; this.a2=(1-a)/a0; }
   p(x){ const y=this.b0*x+this.z1; this.z1=this.b1*x-this.a1*y+this.z2; this.z2=this.b2*x-this.a2*y; return y; }
 }
 let chain=[], dcBlk=null;
 function buildFilters(){
-  const b=BANDS[mode]; const fl=Math.min(b.lp,FS*0.45);
-  chain=[new Biquad('hp',b.hp,FS,0.54),new Biquad('hp',b.hp,FS,1.31),   // 4ª ordem Butterworth (2 biquads)
-         new Biquad('lp',fl,FS,0.54),new Biquad('lp',fl,FS,1.31)];
-  dcBlk=new Biquad('hp',5,FS);
-  $('bandLbl').textContent=b.n; $('fmax').textContent=FS/2;
+  const b=BANDS[mode], fl=Math.min(b.lp,FS*0.45);
+  chain=[new Biquad('hp',b.hp,FS,0.54),new Biquad('hp',b.hp,FS,1.31),new Biquad('lp',fl,FS,0.54),new Biquad('lp',fl,FS,1.31)];
+  dcBlk=new Biquad('hp',5,FS); $('bandLbl').textContent=b.n; $('fmax').textContent=FS/2;
 }
 
-/* -------------------------- posições anatômicas (2 por modo) ---------------- */
-// view: 'ant' (frente) ou 'post' (costas); x,y no torso correspondente (viewBox 0 0 200 260 cada)
+/* -------------------------- posições (2 por modo) -------------------------- */
 const SITES={
- 0:[{id:'r_ant',view:'ant',n:'Frente — 2º espaço intercostal, linha hemiclavicular direita',x:72,y:80,
-     instr:'Paciente sentado, respirando pela boca, um pouco mais fundo que o normal. Apoie o microfone logo abaixo da clavícula direita, entre a 2ª e a 3ª costela, na linha que desce do meio da clavícula.'},
-    {id:'r_post',view:'post',n:'Costas — base pulmonar direita (abaixo da escápula)',x:130,y:172,
-     instr:'Paciente sentado, inclinado levemente à frente, braços cruzados (afasta as escápulas). Apoie o microfone cerca de 3 dedos abaixo da ponta da escápula direita. É o ponto mais sensível para estertores.'}],
- 1:[{id:'c_mit',view:'ant',n:'Foco mitral — ápice (5º EIC, linha hemiclavicular esquerda)',x:128,y:118,
-     instr:'Paciente deitado ou sentado, inclinado à esquerda. Apoie o microfone abaixo do mamilo esquerdo, entre a 5ª e a 6ª costela. Aqui a 1ª bulha (B1) é mais intensa.'},
-    {id:'c_aor',view:'ant',n:'Foco aórtico — 2º EIC, borda esternal direita',x:88,y:70,
-     instr:'Paciente sentado, inclinado à frente, após expirar. Apoie o microfone à direita do esterno, logo abaixo da clavícula. Aqui a 2ª bulha (B2) é mais intensa.'}]
+ 0:[{id:'r_ant',view:'ant',n:'Frente — 2º EIC, linha hemiclavicular direita',x:76,y:118,
+     instr:'<b>Paciente sentado</b>, respirando pela boca, um pouco mais fundo que o normal. Apoie o microfone logo abaixo da clavícula direita, entre a 2ª e a 3ª costela, na linha vertical que desce do meio da clavícula. Pressão firme e constante, sem deslizar.'},
+    {id:'r_post',view:'post',n:'Costas — base pulmonar direita',x:132,y:208,
+     instr:'<b>Paciente sentado, inclinado à frente, braços cruzados</b> (afasta as escápulas). Apoie o microfone cerca de três dedos abaixo da ponta inferior da escápula direita. É o ponto mais sensível para estertores e o de maior amplitude vesicular.'}],
+ 1:[{id:'c_mit',view:'ant',n:'Foco mitral — ápice, 5º EIC linha hemiclavicular esquerda',x:130,y:160,
+     instr:'<b>Paciente deitado de costas ou em decúbito lateral esquerdo.</b> Apoie o microfone abaixo do mamilo esquerdo, entre a 5ª e a 6ª costela. Aqui a 1ª bulha (B1, fechamento mitral/tricúspide) é a mais intensa.'},
+    {id:'c_aor',view:'ant',n:'Foco aórtico — 2º EIC, borda esternal direita',x:88,y:102,
+     instr:'<b>Paciente sentado, inclinado à frente, após expirar.</b> Apoie o microfone à direita do esterno, logo abaixo da clavícula. Aqui a 2ª bulha (B2, fechamento aórtico/pulmonar) é a mais intensa.'}]
 };
 let site=null;
 const allSites=m=>SITES[m];
-function torsoSVG(view,ox,dim){ const T={ant:`<g opacity="${dim?.35:1}" transform="translate(${ox},0)">
-  <ellipse cx="100" cy="236" rx="62" ry="12" fill="#000" opacity=".35"/>
-  <!-- pescoço -->
-  <path d="M84 14 Q100 6 116 14 L118 36 Q100 44 82 36 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
-  <!-- tronco: ombros largos, cintura mais estreita -->
-  <path d="M30 48 Q60 34 82 36 Q100 44 118 36 Q140 34 170 48 Q178 70 176 100 Q172 150 160 190 Q150 232 100 238 Q50 232 40 190 Q28 150 24 100 Q22 70 30 48 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".8"/>
-  <!-- braços -->
-  <path d="M30 48 Q10 62 8 95 Q6 135 16 170 L30 166 Q22 130 26 100 Q28 70 36 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
-  <path d="M170 48 Q190 62 192 95 Q194 135 184 170 L170 166 Q178 130 174 100 Q172 70 164 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/><!-- clavículas -->
-  <path d="M46 52 Q75 62 98 54 M154 52 Q125 62 102 54" fill="none" stroke="#54606f" stroke-width="1.3"/>
-  <!-- esterno -->
-  <line x1="100" y1="54" x2="100" y2="128" stroke="#54606f" stroke-width="1.1"/>
-  <!-- peitorais -->
-  <path d="M48 60 Q52 110 98 112 Q100 80 98 56 Q70 56 48 60 Z" fill="#000" opacity=".10"/>
-  <path d="M152 60 Q148 110 102 112 Q100 80 102 56 Q130 56 152 60 Z" fill="#000" opacity=".10"/>
-  <path d="M48 62 Q54 110 98 112 M152 62 Q146 110 102 112" fill="none" stroke="#54606f" stroke-width=".8"/>
-  <circle cx="72" cy="104" r="2.3" fill="#54606f"/><circle cx="128" cy="104" r="2.3" fill="#54606f"/>
-  <!-- rebordo costal -->
-  <path d="M100 128 Q84 136 62 158 M100 128 Q116 136 138 158" fill="none" stroke="#54606f" stroke-width=".9"/>
-  <!-- costelas (sugestão) -->
-  <path d="M56 118 Q78 132 96 124 M144 118 Q122 132 104 124 M58 134 Q78 146 96 138 M142 134 Q122 146 104 138" fill="none" stroke="#434c58" stroke-width=".6"/>
-  <text x="100" y="256" text-anchor="middle" font-size="10" fill="#cbd3dd" font-family="system-ui">FRENTE</text></g>`,post:`<g opacity="${dim?.35:1}" transform="translate(${ox},0)">
-  <ellipse cx="100" cy="236" rx="62" ry="12" fill="#000" opacity=".35"/>
-  <!-- pescoço -->
-  <path d="M84 14 Q100 6 116 14 L118 36 Q100 44 82 36 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
-  <!-- tronco: ombros largos, cintura mais estreita -->
-  <path d="M30 48 Q60 34 82 36 Q100 44 118 36 Q140 34 170 48 Q178 70 176 100 Q172 150 160 190 Q150 232 100 238 Q50 232 40 190 Q28 150 24 100 Q22 70 30 48 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".8"/>
-  <!-- braços -->
-  <path d="M30 48 Q10 62 8 95 Q6 135 16 170 L30 166 Q22 130 26 100 Q28 70 36 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/>
-  <path d="M170 48 Q190 62 192 95 Q194 135 184 170 L170 166 Q178 130 174 100 Q172 70 164 52 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".6"/><!-- coluna -->
-  <line x1="100" y1="40" x2="100" y2="225" stroke="#54606f" stroke-width="1.3"/>
-  <!-- escápulas -->
-  <path d="M56 58 L92 66 L94 126 Q74 142 60 124 Z" fill="#000" opacity=".12"/>
-  <path d="M144 58 L108 66 L106 126 Q126 142 140 124 Z" fill="#000" opacity=".12"/>
-  <path d="M56 58 L92 66 L94 126 Q74 142 60 124 Z M144 58 L108 66 L106 126 Q126 142 140 124 Z" fill="none" stroke="#54606f" stroke-width=".9"/>
-  <!-- costelas posteriores -->
-  <path d="M56 148 Q78 160 96 152 M144 148 Q122 160 104 152 M58 164 Q78 175 96 168 M142 164 Q122 175 104 168 M62 180 Q80 190 96 184 M138 180 Q120 190 104 184" fill="none" stroke="#434c58" stroke-width=".6"/>
-  <text x="100" y="256" text-anchor="middle" font-size="10" fill="#cbd3dd" font-family="system-ui">COSTAS</text></g>`}; return T[view]; }
+function torsoSVG(view,ox,dim){
+  const base=`<g opacity="${dim?.3:1}" transform="translate(${ox},0)">
+  <ellipse cx="100" cy="280" rx="58" ry="9" fill="#000" opacity=".4"/>
+  <ellipse cx="100" cy="30" rx="22" ry="26" fill="url(#sk)" stroke="#5a6472" stroke-width=".7"/>
+  <path d="M86 50 Q100 58 114 50 L117 70 Q100 78 83 70 Z" fill="url(#sk2)" stroke="#5a6472" stroke-width=".6"/>
+  <path d="M28 84 Q58 66 83 70 Q100 78 117 70 Q142 66 172 84 Q182 108 178 140 Q172 192 154 236 Q142 270 100 274 Q58 270 46 236 Q28 192 22 140 Q18 108 28 84 Z" fill="url(#sk)" stroke="#5a6472" stroke-width=".9"/>
+  <path d="M28 84 Q8 100 6 135 Q4 175 14 210 L30 206 Q22 170 24 140 Q26 108 36 88 Z" fill="url(#sk2)" stroke="#5a6472" stroke-width=".6"/>
+  <path d="M172 84 Q192 100 194 135 Q196 175 186 210 L170 206 Q178 170 176 140 Q174 108 164 88 Z" fill="url(#sk2)" stroke="#5a6472" stroke-width=".6"/>`;
+  const front=`<path d="M44 90 Q74 100 98 92 M156 90 Q126 100 102 92" fill="none" stroke="#5f6b7b" stroke-width="1.4"/>
+  <line x1="100" y1="92" x2="100" y2="166" stroke="#5f6b7b" stroke-width="1.2"/>
+  <path d="M46 98 Q52 150 98 152 Q100 120 98 94 Q70 94 46 98 Z" fill="#000" opacity=".12"/>
+  <path d="M154 98 Q148 150 102 152 Q100 120 102 94 Q130 94 154 98 Z" fill="#000" opacity=".12"/>
+  <path d="M46 100 Q52 150 98 152 M154 100 Q148 150 102 152" fill="none" stroke="#5f6b7b" stroke-width=".9"/>
+  <circle cx="72" cy="142" r="2.6" fill="#5f6b7b"/><circle cx="128" cy="142" r="2.6" fill="#5f6b7b"/>
+  <path d="M100 166 Q84 174 60 198 M100 166 Q116 174 140 198" fill="none" stroke="#5f6b7b" stroke-width="1"/>
+  <path d="M54 156 Q78 172 96 164 M146 156 Q122 172 104 164 M56 174 Q78 188 96 180 M144 174 Q122 188 104 180" fill="none" stroke="#4a5362" stroke-width=".6"/>
+  <text x="100" y="296" text-anchor="middle" font-size="11" font-weight="700" fill="#cbd3dd" font-family="system-ui">FRENTE</text>
+  <text x="30" y="296" text-anchor="middle" font-size="8" fill="#8b96a7" font-family="system-ui">D</text><text x="170" y="296" text-anchor="middle" font-size="8" fill="#8b96a7" font-family="system-ui">E</text>`;
+  const back=`<line x1="100" y1="76" x2="100" y2="266" stroke="#5f6b7b" stroke-width="1.4"/>
+  <path d="M54 96 L92 104 L94 166 Q74 184 58 164 Z" fill="#000" opacity=".14"/>
+  <path d="M146 96 L108 104 L106 166 Q126 184 142 164 Z" fill="#000" opacity=".14"/>
+  <path d="M54 96 L92 104 L94 166 Q74 184 58 164 Z M146 96 L108 104 L106 166 Q126 184 142 164 Z" fill="none" stroke="#5f6b7b" stroke-width="1"/>
+  <path d="M54 188 Q78 200 96 192 M146 188 Q122 200 104 192 M56 204 Q78 215 96 208 M144 204 Q122 215 104 208 M60 220 Q80 230 96 224 M140 220 Q120 230 104 224" fill="none" stroke="#4a5362" stroke-width=".6"/>
+  <text x="100" y="296" text-anchor="middle" font-size="11" font-weight="700" fill="#cbd3dd" font-family="system-ui">COSTAS</text>
+  <text x="30" y="296" text-anchor="middle" font-size="8" fill="#8b96a7" font-family="system-ui">E</text><text x="170" y="296" text-anchor="middle" font-size="8" fill="#8b96a7" font-family="system-ui">D</text>`;
+  return base+(view==='ant'?front:back)+'</g>';
+}
 function drawTorso(){
-  const s=$('torso');
-  let h=`<defs><radialGradient id="sk" cx="40%" cy="30%" r="80%"><stop offset="0" stop-color="#3a4452"/><stop offset=".6" stop-color="#262d37"/><stop offset="1" stop-color="#171c23"/></radialGradient></defs>`;
-  const has=v=>SITES[mode].some(p=>p.view===v); h+=torsoSVG('ant',0,!has('ant'))+torsoSVG('post',210,!has('post'));
-  s.innerHTML=h;
+  const s=$('torso'), has=v=>SITES[mode].some(p=>p.view===v);
+  s.innerHTML=`<defs><radialGradient id="sk" cx="38%" cy="28%" r="85%"><stop offset="0" stop-color="#414c5c"/><stop offset=".55" stop-color="#2a323e"/><stop offset="1" stop-color="#171c24"/></radialGradient>
+  <radialGradient id="sk2" cx="40%" cy="30%" r="90%"><stop offset="0" stop-color="#37414f"/><stop offset="1" stop-color="#1a2029"/></radialGradient></defs>`
+  +torsoSVG('ant',10,!has('ant'))+torsoSVG('post',220,!has('post'));
+  const col=mode?'#fb7185':'#38bdf8';
   SITES[mode].forEach((p,i)=>{
-    const ox=p.view==='ant'?0:210, sel=site&&site.id===p.id, col=mode?'#ff6b6b':'#3fb8ff';
-    const gg=document.createElementNS('http://www.w3.org/2000/svg','g'); gg.setAttribute('transform',`translate(${ox},0)`); gg.style.cursor='pointer';
-    gg.innerHTML=`<circle cx="${p.x}" cy="${p.y}" r="${sel?15:11}" fill="${col}" opacity="${sel?.28:.15}"/>
-      <circle cx="${p.x}" cy="${p.y}" r="7" fill="${sel?col:'#2a323d'}" stroke="${sel?'#fff':col}" stroke-width="1.6"/>
-      <text x="${p.x}" y="${p.y+3.5}" text-anchor="middle" font-size="9" font-weight="700" fill="${sel?'#000':'#fff'}">${i+1}</text>`;
-    gg.onclick=()=>{site=p;drawTorso();}; s.appendChild(gg);
+    const ox=p.view==='ant'?10:220, sel=site&&site.id===p.id;
+    const g=document.createElementNS('http://www.w3.org/2000/svg','g'); g.setAttribute('transform',`translate(${ox},0)`); g.style.cursor='pointer';
+    g.innerHTML=`<circle cx="${p.x}" cy="${p.y}" r="30" fill="transparent"/>
+      <circle cx="${p.x}" cy="${p.y}" r="${sel?24:18}" fill="${col}" opacity="${sel?.25:.12}">${sel?'<animate attributeName="r" values="20;27;20" dur="1.6s" repeatCount="indefinite"/>':''}</circle>
+      <circle cx="${p.x}" cy="${p.y}" r="12" fill="${sel?col:'#1b222c'}" stroke="${sel?'#fff':col}" stroke-width="2.2"/>
+      <text x="${p.x}" y="${p.y+5}" text-anchor="middle" font-size="13" font-weight="800" fill="${sel?'#0b0e13':'#fff'}" font-family="system-ui">${i+1}</text>`;
+    g.onclick=()=>{site=p;drawTorso();}; s.appendChild(g);
   });
   $('siteName').textContent=site?site.n:'toque em um ponto';
-  $('siteInstr').textContent=(site?site.instr:'Selecione a posição no diagrama ou no pop-up de medição.')+' (Frente: direita do paciente à esquerda da tela. Costas: direita do paciente à direita da tela.)';
+  $('siteInstr').innerHTML=site?site.instr:'Toque no ponto <b>1</b> ou <b>2</b> do diagrama, ou escolha no pop-up de medição. D/E = lado do paciente.';
 }
+
 /* -------------------------- estado ----------------------------------------- */
-let mode=0, dev=null, connected=false, simTimer=null;
-let lastSeq=null, lost=0, pkts=0, samples=0, t0=performance.now(), clipCnt=0;
+let mode=0, dev=null, connected=false, simTimer=null, simBuf=null, wakeLock=null;
+let lastSeq=null, lost=0, pkts=0, samples=0, t0=performance.now(), clipCnt=0, lastRaw=2048;
 const WAVE_N=DISP_FS*4, ENV_N=ENV_HZ*20;
 const wave=new Float32Array(WAVE_N); let wi=0, dispAcc=0;
-const env=new Float32Array(ENV_N); let ei=0;
-let sq=0, sqN=0;                   // acumulador RMS
+const env=new Float32Array(ENV_N); let ei=0; let sq=0, sqN=0;
 const peaks=[];
-const $=id=>document.getElementById(id);
-const st=m=>$('status').textContent=m;
+function msg(m,kind){ $('msg').textContent=m; $('msg').style.color=kind==='err'?'#fb7185':kind==='ok'?'#34d399':''; }
+function pill(txt,cls){ $('pillTxt').textContent=txt; $('pill').className='pill '+(cls||''); }
 
 /* -------------------------- FFT / espectrograma ---------------------------- */
-const NFFT=512, HOP=256, K=NFFT/2;
-let SPEC_COLS, spec, sc=0; const fftBuf=new Float32Array(NFFT); let fftFill=0;
+const NFFT=512, HOP=256, K=NFFT/2; let SPEC_COLS, spec, sc=0; const fftBuf=new Float32Array(NFFT); let fftFill=0;
 const hann=Float32Array.from({length:NFFT},(_,i)=>0.5-0.5*Math.cos(2*Math.PI*i/NFFT));
 function specReset(){ SPEC_COLS=Math.ceil(8*FS/HOP); spec=new Uint8Array(SPEC_COLS*K); sc=0; fftFill=0; }
 function fft(re,im){ const n=re.length; for(let i=1,j=0;i<n;i++){ let bit=n>>1; for(;j&bit;bit>>=1) j^=bit; j^=bit; if(i<j){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];} }
@@ -209,50 +215,46 @@ const re=new Float32Array(NFFT), im=new Float32Array(NFFT);
 function pushSpec(x){
   fftBuf[fftFill++]=x; if(fftFill<NFFT) return;
   for(let i=0;i<NFFT;i++){re[i]=fftBuf[i]*hann[i];im[i]=0;} fft(re,im);
-  const base=sc*K;
-  for(let k=0;k<K;k++){ const db=20*Math.log10(Math.hypot(re[k],im[k])+1); spec[base+k]=Math.max(0,Math.min(255,(db-10)*4)); }
+  const base=sc*K; for(let k=0;k<K;k++){ const db=20*Math.log10(Math.hypot(re[k],im[k])+1); spec[base+k]=Math.max(0,Math.min(255,(db-10)*4)); }
   sc=(sc+1)%SPEC_COLS; fftBuf.copyWithin(0,HOP); fftFill=NFFT-HOP;
 }
 
-/* -------------------------- sessão/gravação -------------------------------- */
+/* -------------------------- sessão ----------------------------------------- */
 let session=null; const sessions=[];
-function startSession(dur,note){
+async function startSession(dur,note){
   session={t0:performance.now(),dur:dur*1000,note,mode,site:site?site.n:'—',rows:[],rates:[],ints:[],ie:[],raw:[],fs:FS};
   $('rec').style.display='inline'; $('bStart').textContent='Parar'; $('bStart').className='stop';
+  try{ wakeLock=await navigator.wakeLock?.request('screen'); }catch(e){}
 }
 function stopSession(){
   if(!session) return;
-  const s=session; session=null; $('rec').style.display='none'; $('bStart').textContent='Iniciar medição'; $('bStart').className='go';
+  const s=session; session=null; $('rec').style.display='none'; $('bStart').textContent='Iniciar medição'; $('bStart').className='go'; wakeLock?.release?.(); wakeLock=null;
   const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN;
   const rmsM=mean(s.rows.map(r=>r.rms)), rateM=mean(s.rates);
   const cv=s.ints.length>2?Math.sqrt(mean(s.ints.map(v=>(v-mean(s.ints))**2)))/mean(s.ints):NaN;
   const reg=isNaN(cv)?'—':Math.max(0,100-100*cv).toFixed(0)+' %';
   const ie=s.mode===0&&s.ie.length?'1 : '+(1/mean(s.ie)).toFixed(1):'—';
   const rec={n:sessions.length+1,time:new Date().toLocaleTimeString(),mode:s.mode?'Batimento':'Respiração',site:s.site,dur:((performance.now()-s.t0)/1000).toFixed(0)+' s',
-             rms:isNaN(rmsM)?'—':rmsM.toFixed(1),rate:isNaN(rateM)?'—':rateM.toFixed(0)+(s.mode?' bpm':' rpm'),reg,ie,note:s.note,rows:s.rows,raw:s.raw,fs:s.fs};
+    rms:isNaN(rmsM)?'—':rmsM.toFixed(1),rate:isNaN(rateM)?'—':rateM.toFixed(0)+(s.mode?' bpm':' rpm'),reg,ie,note:s.note,rows:s.rows,raw:s.raw,fs:s.fs};
   sessions.push(rec);
   $('sess').insertAdjacentHTML('beforeend',`<tr><td>${rec.n}</td><td>${rec.time}</td><td>${rec.mode}</td><td>${rec.site}</td><td>${rec.dur}</td><td>${rec.rms}</td><td>${rec.rate}</td><td>${rec.reg}</td><td>${rec.ie}</td><td>${rec.note||''}</td></tr>`);
-  st(`Sessão ${rec.n} concluída: ${rec.rate}, RMS ${rec.rms}.`);
+  msg(`Sessão ${rec.n} concluída: ${rec.rate}, RMS ${rec.rms}.`,'ok');
 }
 function download(blob,name){ const a=document.createElement('a'); a.href=URL.createObjectURL(blob); a.download=name; a.click(); }
-$('bCsv').onclick=()=>{
-  if(!sessions.length){st('Nenhuma sessão.');return;}
+$('bCsv').onclick=()=>{ if(!sessions.length){msg('Nenhuma sessão.');return;}
   let csv='sessao;hora;modo;posicao;obs;t_s;rms;freq\n';
   for(const s of sessions) for(const r of s.rows) csv+=`${s.n};${s.time};${s.mode};${s.site};${s.note||''};${r.t.toFixed(3)};${r.rms.toFixed(1)};${r.rate||''}\n`;
-  download(new Blob([csv],{type:'text/csv'}),'ausculta_'+Date.now()+'.csv');
-};
-$('bWav').onclick=()=>{ // WAV 16 bits mono do sinal bruto (ADC 12 bits centrado), p/ análise em Python/Audacity
-  const s=sessions[sessions.length-1]; if(!s){st('Nenhuma sessão.');return;}
-  const n=s.raw.length, buf=new ArrayBuffer(44+2*n), v=new DataView(buf); const w=(o,str)=>{for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i));};
+  download(new Blob([csv],{type:'text/csv'}),'ausculta_'+Date.now()+'.csv'); };
+$('bWav').onclick=()=>{ const s=sessions[sessions.length-1]; if(!s){msg('Nenhuma sessão.');return;}
+  const n=s.raw.length, buf=new ArrayBuffer(44+2*n), v=new DataView(buf), w=(o,str)=>{for(let i=0;i<str.length;i++) v.setUint8(o+i,str.charCodeAt(i));};
   w(0,'RIFF'); v.setUint32(4,36+2*n,true); w(8,'WAVE'); w(12,'fmt '); v.setUint32(16,16,true); v.setUint16(20,1,true); v.setUint16(22,1,true);
   v.setUint32(24,s.fs,true); v.setUint32(28,s.fs*2,true); v.setUint16(32,2,true); v.setUint16(34,16,true); w(36,'data'); v.setUint32(40,2*n,true);
   for(let i=0;i<n;i++) v.setInt16(44+2*i,(s.raw[i]-2048)*16,true);
-  download(new Blob([buf],{type:'audio/wav'}),`ausculta_s${s.n}_${s.mode}_${s.fs}Hz.wav`);
-};
+  download(new Blob([buf],{type:'audio/wav'}),`ausculta_s${s.n}_${s.mode}_${s.fs}Hz.wav`); };
 $('bClr').onclick=()=>{sessions.length=0;$('sess').innerHTML='';};
 
 /* -------------------------- processamento ---------------------------------- */
-let curRate=null, lastRaw=2048;
+let curRate=null;
 function onPacket(dv){
   const seq=dv.getUint16(0,true);
   if(lastSeq!==null){ const d=(seq-lastSeq)&0xffff; if(d>1) lost+=d-1; } lastSeq=seq; pkts++;
@@ -260,47 +262,55 @@ function onPacket(dv){
   for(let i=0;i<n;i++){
     const raw=dv.getUint16(2+2*i,true); samples++; lastRaw=raw; if(raw<=2||raw>=4093) clipCnt++;
     if(session) session.raw.push(raw);
-    let x=raw-2048;
-    pushSpec(dcBlk.p(x));
-    for(const f of chain) x=f.p(x);           // banda do modo
+    let x=raw-2048; pushSpec(dcBlk.p(x));
+    for(const f of chain) x=f.p(x);
     sq+=x*x; sqN++;
     if(++dispAcc>=dec){ dispAcc=0; wave[wi]=x; wi=(wi+1)%WAVE_N; }
     if(sqN>=winN){ const rms=Math.sqrt(sq/sqN); sq=0; sqN=0; onEnvelope(rms); }
   }
 }
 function onEnvelope(rms){
-  const now=performance.now();
-  env[ei]=rms; ei=(ei+1)%ENV_N;
-  detect(rms,now);
+  const now=performance.now(); env[ei]=rms; ei=(ei+1)%ENV_N; detect(rms,now);
   $('rms').textContent=rms.toFixed(0); $('rmsdb').textContent=rms>0?(20*Math.log10(rms/2048)).toFixed(1)+' dBFS':'';
-  if(session){
-    session.rows.push({t:(now-session.t0)/1000,rms,rate:curRate});
-    if(now-session.t0>=session.dur) stopSession(); else $('cnt').textContent=((session.dur-(now-session.t0))/1000).toFixed(0)+' s';
-  }
+  if(session){ session.rows.push({t:(now-session.t0)/1000,rms,rate:curRate});
+    if(now-session.t0>=session.dur) stopSession(); else $('cnt').textContent=((session.dur-(now-session.t0))/1000).toFixed(0)+' s'; }
 }
-let emaMean=0, emaMax=0, above=false, tUpPrev=0, tDown=0, ieHist=[];
+let emaMean=0, emaMax=0, above=false, tUpPrev=0, tDown=0, ieHist=[], acN=0;
 function detect(v,t){
   emaMean+=(v-emaMean)*0.02; emaMax=Math.max(v,emaMax*0.995);
-  const thr=emaMean+(mode===1?0.4:0.55)*(emaMax-emaMean), refr=mode===1?300:2500;
+  const thr=emaMean+(mode===1?0.4:0.55)*(emaMax-emaMean), refr=mode===1?450:2500;
   const lastP=peaks.length?peaks[peaks.length-1]:-1e9;
   if(!above&&v>thr&&t-lastP>refr){ above=true; peaks.push(t); if(peaks.length>12) peaks.shift();
     if(mode===0&&tDown>0){ const tIn=tDown-tUpPrev, tEx=t-tDown; if(tIn>200&&tEx>200){ ieHist.push(tIn/tEx); if(ieHist.length>6) ieHist.shift(); if(session) session.ie.push(tIn/tEx);} } tUpPrev=t; }
   if(above&&v<thr*0.8){ above=false; tDown=t; }
-  if(peaks.length>=3){
-    const iv=[]; for(let i=1;i<peaks.length;i++) iv.push(peaks[i]-peaks[i-1]);
-    const med=[...iv].sort((a,b)=>a-b)[iv.length>>1]; curRate=Math.round(60000/med); $('rate').textContent=curRate;
-    if(session){ session.rates.push(curRate); session.ints.push(iv[iv.length-1]); }
-    if(mode===1){ const m=iv.reduce((a,b)=>a+b,0)/iv.length, cv=Math.sqrt(iv.reduce((a,b)=>a+(b-m)**2,0)/iv.length)/m; $('xVal').textContent=Math.max(0,100-100*cv).toFixed(0)+' %'; }
-  }
-  if(mode===0&&ieHist.length){ const m=ieHist.reduce((a,b)=>a+b,0)/ieHist.length; $('xVal').textContent='1 : '+(1/m).toFixed(1); }
+  if(mode===0){
+    if(peaks.length>=3){ const iv=[]; for(let i=1;i<peaks.length;i++) iv.push(peaks[i]-peaks[i-1]);
+      const med=[...iv].sort((a,b)=>a-b)[iv.length>>1]; curRate=Math.round(60000/med); $('rate').textContent=curRate;
+      if(session){ session.rates.push(curRate); session.ints.push(iv[iv.length-1]); } }
+    if(ieHist.length){ const m=ieHist.reduce((a,b)=>a+b,0)/ieHist.length; $('xVal').textContent='1 : '+(1/m).toFixed(1); }
+  } else if(++acN>=ENV_HZ){ acN=0; heartAutocorr(); }   // 1x por segundo
 }
-
+// FC por autocorrelação do envelope (robusto a B1/B2): janela 10 s, lags 0,4–1,5 s (40–150 bpm), mediana das 3 últimas
+const hrHist=[];
+function heartAutocorr(){
+  const W=10*ENV_HZ, x=new Float32Array(W); let m=0;
+  for(let i=0;i<W;i++){ x[i]=env[(ei-W+i+ENV_N)%ENV_N]; m+=x[i]; } m/=W; for(let i=0;i<W;i++) x[i]-=m;
+  let r0=0; for(let i=0;i<W;i++) r0+=x[i]*x[i]; if(r0<=0||samples<10*FS) return;
+  const lmin=Math.round(0.4*ENV_HZ), lmax=Math.round(1.5*ENV_HZ); let best=0, bl=0;
+  for(let l=lmin;l<=lmax;l++){ let r=0; for(let i=0;i<W-l;i++) r+=x[i]*x[i+l]; r=r/(W-l)/(r0/W); if(r>best){best=r;bl=l;} }
+  if(best<0.12) return;
+  hrHist.push(Math.round(60*ENV_HZ/bl)); if(hrHist.length>3) hrHist.shift();
+  curRate=[...hrHist].sort((a,b)=>a-b)[hrHist.length>>1]; $('rate').textContent=curRate;
+  $('xVal').textContent=Math.round(Math.min(1,best/0.6)*100)+' %';
+  if(session){ session.rates.push(curRate); session.ints.push(bl*1000/ENV_HZ); }
+}
 /* -------------------------- desenho ---------------------------------------- */
-function fit(c){ const r=c.getBoundingClientRect(); const w=Math.round(r.width*devicePixelRatio),h=Math.round(r.height*devicePixelRatio); if(c.width!==w||c.height!==h){c.width=w;c.height=h;} }
+function fit(c){ const r=c.getBoundingClientRect(), w=Math.round(r.width*devicePixelRatio), h=Math.round(r.height*devicePixelRatio); if(c.width!==w||c.height!==h){c.width=w;c.height=h;} }
+function grid(g,W,H){ g.strokeStyle='#182029'; g.lineWidth=1; for(let i=1;i<4;i++){ g.beginPath(); g.moveTo(0,H*i/4); g.lineTo(W,H*i/4); g.stroke(); } }
 function drawWave(){
-  const c=$('wave'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height;
-  g.clearRect(0,0,W,H); let mx=1; for(let i=0;i<WAVE_N;i++) mx=Math.max(mx,Math.abs(wave[i]));
-  g.strokeStyle=mode?'#ff6b6b':'#3fb8ff'; g.lineWidth=1.5*devicePixelRatio; g.beginPath();
+  const c=$('wave'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height; g.clearRect(0,0,W,H); grid(g,W,H);
+  let mx=1; for(let i=0;i<WAVE_N;i++) mx=Math.max(mx,Math.abs(wave[i]));
+  g.strokeStyle=mode?'#fb7185':'#38bdf8'; g.lineWidth=1.6*devicePixelRatio; g.beginPath();
   const step=Math.max(1,Math.floor(WAVE_N/W));
   for(let i=0,x=0;i<WAVE_N;i+=step,x+=step*W/WAVE_N){ const y=H/2-wave[(wi+i)%WAVE_N]/mx*H*0.45; i?g.lineTo(x,y):g.moveTo(x,y); }
   g.stroke();
@@ -313,85 +323,103 @@ function drawSpec(){
   for(let x=0;x<SPEC_COLS;x++){ const col=(sc+x)%SPEC_COLS;
     for(let k=0;k<K;k++){ const v=spec[col*K+k], p=4*((K-1-k)*SPEC_COLS+x); d[p]=Math.min(255,v*2); d[p+1]=Math.max(0,v*2-200); d[p+2]=Math.max(0,120-v); d[p+3]=255; } }
   createImageBitmap(specImg).then(b=>{ g.imageSmoothingEnabled=false; g.clearRect(0,0,W,H); g.drawImage(b,0,0,W,H); b.close();
-    const bd=BANDS[mode]; g.strokeStyle='#ffffff88'; g.setLineDash([4,4]); g.lineWidth=devicePixelRatio;
+    const bd=BANDS[mode]; g.strokeStyle='#ffffff99'; g.setLineDash([5,5]); g.lineWidth=devicePixelRatio;
     for(const f of [bd.hp,bd.lp]){ const y=H-f/(FS/2)*H; g.beginPath(); g.moveTo(0,y); g.lineTo(W,y); g.stroke(); } g.setLineDash([]); });
 }
 function drawEnv(){
-  const c=$('env'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height;
-  g.clearRect(0,0,W,H); let mx=1; for(let i=0;i<ENV_N;i++) mx=Math.max(mx,env[i]);
-  g.strokeStyle='#ffd166'; g.lineWidth=2*devicePixelRatio; g.beginPath();
+  const c=$('env'); fit(c); const g=c.getContext('2d'),W=c.width,H=c.height; g.clearRect(0,0,W,H); grid(g,W,H);
+  let mx=1; for(let i=0;i<ENV_N;i++) mx=Math.max(mx,env[i]);
+  g.strokeStyle='#fbbf24'; g.lineWidth=2*devicePixelRatio; g.beginPath();
   for(let i=0;i<ENV_N;i++){ const x=i*W/ENV_N, y=H-env[(ei+i)%ENV_N]/mx*H*0.9; i?g.lineTo(x,y):g.moveTo(x,y); }
-  g.stroke();
-  const now=performance.now(); g.fillStyle='#fff';
-  for(const p of peaks){ const age=now-p; if(age<20000) g.fillRect(W-age/20000*W-1,0,2*devicePixelRatio,H*0.08); }
+  g.stroke(); const now=performance.now(); g.fillStyle='#fff';
+  for(const p of peaks){ const age=now-p; if(age<20000) g.fillRect(W-age/20000*W-1,0,2*devicePixelRatio,H*0.1); }
 }
-let frame=0;
+let frame=0, lastStat=0;
 function loop(){ drawWave(); drawEnv(); if(frame++%3===0) drawSpec();
-  const el=(performance.now()-t0)/1000;
-  $('stats').textContent=`pacotes: ${pkts} | perdidos: ${lost} | ${(pkts/el).toFixed(1)} pkt/s | ${(samples/el).toFixed(0)} amostras/s (esperado ${FS}) | ADC atual: ${lastRaw} | saturações: ${clipCnt}`;
+  const now=performance.now(), el=(now-t0)/1000;
+  if(now-lastStat>500){ lastStat=now; const sps=samples/el, bad=(connected||simTimer)&&el>3&&Math.abs(sps-FS)/FS>0.05;
+    $('stats').textContent=`pacotes ${pkts} · perdidos ${lost} · ${(pkts/el).toFixed(1)} pkt/s · ${sps.toFixed(0)} amostras/s (esperado ${FS}) · ADC atual ${lastRaw} · saturações ${clipCnt}`;
+    if(connected) pill(bad?`Conectado · taxa ≠ ${FS} Hz`:'Conectado · '+(dev?.name||'ESP32'),bad?'warn':'on'); }
   requestAnimationFrame(loop); }
 requestAnimationFrame(loop);
 
 /* -------------------------- modo / taxa ------------------------------------ */
-function resetSignal(){ peaks.length=0; ieHist.length=0; curRate=null; emaMean=0; emaMax=0; above=false; tDown=0; sq=0; sqN=0; $('rate').textContent='—'; $('xVal').textContent='—'; }
+function resetSignal(){ hrHist.length=0; acN=0; peaks.length=0; ieHist.length=0; curRate=null; emaMean=0; emaMax=0; above=false; tDown=0; sq=0; sqN=0; $('rate').textContent='—'; $('xVal').textContent='—'; }
 function setMode(m){
-  mode=m; site=null; buildFilters(); drawTorso(); resetSignal();
+  mode=m; site=null; document.body.classList.toggle('hr',m===1); buildFilters(); drawTorso(); resetSignal();
   $('bResp').classList.toggle('on',m===0); $('bHr').classList.toggle('on',m===1);
   $('rateLbl').textContent=m?'Freq. cardíaca':'Freq. respiratória'; $('rateUnit').textContent=m?'bpm':'rpm';
-  $('xLbl').textContent=m?'Regularidade do ritmo':'Razão I:E'; $('xUnit').textContent=m?'100 % = intervalos iguais':'insp : exp (normal ≈ 1:2)';
+  $('xLbl').textContent=m?'Regularidade do ritmo':'Razão I:E'; $('xUnit').textContent=m?'100 % = intervalos iguais':'insp : exp · normal ≈ 1:2';
+  if(simTimer){ stopSim(); startSim(); }
 }
 $('selFs').onchange=e=>{ FS=+e.target.value; buildFilters(); specReset(); resetSignal(); wave.fill(0); if(simTimer){stopSim();startSim();} };
 $('bResp').onclick=()=>setMode(0); $('bHr').onclick=()=>setMode(1);
 
-/* -------------------------- diálogo de medição ----------------------------- */
+/* -------------------------- diálogo ---------------------------------------- */
 function fillSites(m){ $('dSite').innerHTML=allSites(m).map((p,i)=>`<option value="${p.id}" ${site&&site.id===p.id?'selected':''}>${i+1}. ${p.n}</option>`).join(''); }
 $('bStart').onclick=()=>{ if(session){stopSession();return;} $('dMode').value=mode; fillSites(mode); $('ovl').classList.add('show'); };
 $('dMode').onchange=e=>fillSites(+e.target.value);
 $('dCancel').onclick=()=>$('ovl').classList.remove('show');
 $('dGo').onclick=()=>{
   const m=+$('dMode').value; if(m!==mode) setMode(m);
-  site=allSites(mode).find(p=>p.id===$('dSite').value)||null; drawTorso();
-  $('ovl').classList.remove('show');
-  if(!simTimer&&!connected){ st('Conecte ao ESP ou ative a simulação antes de medir.'); return; }
+  site=allSites(mode).find(p=>p.id===$('dSite').value)||null; drawTorso(); $('ovl').classList.remove('show');
+  if(!simTimer&&!connected){ msg('Conecte ao ESP ou ative a simulação antes de medir.','err'); return; }
   startSession(+$('dDur').value,$('dNote').value);
 };
 
 /* -------------------------- BLE -------------------------------------------- */
+function resetLink(){ lastSeq=null; lost=0; pkts=0; samples=0; clipCnt=0; t0=performance.now(); resetSignal(); }
+async function subscribe(){
+  const srv=await (await dev.gatt.connect()).getPrimaryService(SVC);
+  const ch=await srv.getCharacteristic(CH_DATA);
+  await ch.startNotifications();
+  ch.addEventListener('characteristicvaluechanged',e=>onPacket(e.target.value));
+  resetLink(); connected=true; pill('Conectado · '+(dev.name||'ESP32'),'on'); msg('Recebendo dados. Confira "amostras/s" com a taxa do menu ADC.','ok'); $('bConn').textContent='Desconectar';
+}
+async function onDisconnected(){
+  connected=false; pill('Reconectando…','warn'); msg('Conexão perdida; tentando reconectar.','err');
+  for(let i=0;i<4&&dev;i++){ await new Promise(r=>setTimeout(r,800*(i+1))); try{ await subscribe(); return; }catch(e){} }
+  pill('Desconectado'); msg('Não foi possível reconectar. Toque em "Conectar BLE".','err'); $('bConn').textContent='Conectar BLE';
+}
 $('bConn').onclick=async()=>{
-  if(!navigator.bluetooth){ st('Web Bluetooth indisponível. Use o Chrome no Android.'); return; }
+  if(connected&&dev){ const d=dev; dev=null; d.gatt.disconnect(); connected=false; pill('Desconectado'); msg('Desconectado.'); $('bConn').textContent='Conectar BLE'; return; }
+  if(!navigator.bluetooth){ msg('Web Bluetooth indisponível: use o Chrome (ou Edge) no Android, em HTTPS.','err'); return; }
   try{
-    stopSim(); st('Procurando...');
-    dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]}],optionalServices:[SVC]});
-    dev.addEventListener('gattserverdisconnected',()=>{st('Desconectado.');connected=false;});
-    const srv=await (await dev.gatt.connect()).getPrimaryService(SVC);
-    const ch=await srv.getCharacteristic(CH_DATA);
-    await ch.startNotifications();
-    ch.addEventListener('characteristicvaluechanged',e=>onPacket(e.target.value));
-    lastSeq=null; lost=0; pkts=0; samples=0; clipCnt=0; t0=performance.now(); resetSignal(); connected=true;
-    st('Conectado a '+(dev.name||'ESP32')+' — confira "amostras/s" com a taxa escolhida no menu ADC.');
-  }catch(e){ st('Erro: '+e.message); }
+    stopSim(); pill('Procurando…','warn'); msg('Selecione "Ausculta-C3" na lista.');
+    dev=await navigator.bluetooth.requestDevice({filters:[{services:[SVC]},{namePrefix:'Ausculta'}],optionalServices:[SVC]});
+    dev.addEventListener('gattserverdisconnected',onDisconnected);
+    await subscribe();
+  }catch(e){ dev=null; pill('Desconectado'); msg(/cancel/i.test(e.message)?'Seleção cancelada.':'Erro BLE: '+e.message,'err'); }
 };
 
-/* -------------------------- simulação (ADC cru: coração + pulmão + ruído) --- */
-function startSim(){
-  let seq=0, t=0, nz=0; const N=Math.round(FS/33), PK=1000/33;
-  simTimer=setInterval(()=>{
-    const buf=new DataView(new ArrayBuffer(2+2*N));
-    for(let i=0;i<N;i++){ t+=1/FS;
-      const ph=(2*Math.PI*1.2*t)%(2*Math.PI);                                   // 72 bpm
-      const eh=Math.exp(-8*(ph-0.6)*(ph-0.6))+0.6*Math.exp(-8*(ph-2.2)*(ph-2.2));
-      const heart=eh*900*Math.sin(2*Math.PI*40*t);
-      const pr=(2*Math.PI*0.25*t)%(2*Math.PI);                                  // 15 rpm
-      const er=pr<2.1?Math.sin(pr/2.1*Math.PI):0.55*Math.sin((pr-2.1)/4.18*Math.PI);
-      nz=0.6*nz+(Math.random()*2-1); const lung=er*450*nz;                     // ruído passa-baixa ~ pulmão
-      const v=2048+heart+lung+(Math.random()*2-1)*20;
-      buf.setUint16(2+2*i,Math.max(0,Math.min(4095,v|0)),true); }
-    buf.setUint16(0,seq++&0xffff,true); onPacket(buf);
-  },PK);
-  $('bSim').classList.add('on'); st('Simulação ativa (coração + pulmão sobrepostos; o filtro do modo separa).'); lastSeq=null;lost=0;pkts=0;samples=0;t0=performance.now();
+/* -------------------------- simulação com gravações reais ------------------ */
+function parseWav(ab){ const v=new DataView(ab); let p=12, fs=4000, data=null;
+  while(p<v.byteLength-8){ const id=String.fromCharCode(v.getUint8(p),v.getUint8(p+1),v.getUint8(p+2),v.getUint8(p+3)), len=v.getUint32(p+4,true);
+    if(id==='fmt ') fs=v.getUint32(p+12,true); else if(id==='data'){ data=new Int16Array(ab.slice(p+8,p+8+len)); } p+=8+len+(len&1); }
+  return {fs,data}; }
+async function loadSim(m){
+  try{ const r=await fetch(SIM_FILES[m]); if(!r.ok) throw 0; const {fs,data}=parseWav(await r.arrayBuffer());
+    const n=Math.floor(data.length*FS/fs), out=new Float32Array(n);
+    for(let i=0;i<n;i++){ const t=i*fs/FS, k=Math.floor(t), f=t-k; out[i]=(data[k]*(1-f)+(data[Math.min(k+1,data.length-1)])*f)/32768; }
+    return {buf:out,real:true}; }
+  catch(e){ // fallback sintético
+    const n=FS*20, out=new Float32Array(n); let nz=0;
+    for(let i=0;i<n;i++){ const t=i/FS; if(m){ const ph=(2*Math.PI*1.2*t)%(2*Math.PI), e=Math.exp(-8*(ph-0.6)**2)+0.6*Math.exp(-8*(ph-2.2)**2); out[i]=e*0.5*Math.sin(2*Math.PI*40*t); }
+      else { const pr=(2*Math.PI*0.25*t)%(2*Math.PI), e=pr<2.1?Math.sin(pr/2.1*Math.PI):0.55*Math.sin((pr-2.1)/4.18*Math.PI); nz=0.6*nz+(Math.random()*2-1); out[i]=e*0.3*nz; } }
+    return {buf:out,real:false}; }
 }
-function stopSim(){ if(simTimer){clearInterval(simTimer);simTimer=null;$('bSim').classList.remove('on');} }
-$('bSim').onclick=()=>simTimer?stopSim():startSim();
+async function startSim(){
+  $('bSim').classList.add('on'); pill('Simulação','warn'); msg('Carregando gravação…');
+  const {buf,real}=await loadSim(mode); if(!$('bSim').classList.contains('on')) return;
+  simBuf=buf; let seq=0, pos=0; const N=Math.round(FS/33);
+  resetLink();
+  simTimer=setInterval(()=>{ const dv=new DataView(new ArrayBuffer(2+2*N));
+    for(let i=0;i<N;i++){ const v=2048+simBuf[pos]*1700+(Math.random()*2-1)*6; pos=(pos+1)%simBuf.length; dv.setUint16(2+2*i,Math.max(0,Math.min(4095,v|0)),true); }
+    dv.setUint16(0,seq++&0xffff,true); onPacket(dv); },1000/33);
+  msg(real?`Simulação com gravação real (${mode?'PhysioNet/CinC 2016, coração normal ~61 bpm':'ICBHI 2017, pulmão saudável ~21 rpm'}).`:'Simulação sintética (gravações não disponíveis neste modo de abertura).','ok');
+}
+function stopSim(){ if(simTimer){clearInterval(simTimer);simTimer=null;} $('bSim').classList.remove('on'); if(!connected) pill('Desconectado'); }
+$('bSim').onclick=()=>simTimer||$('bSim').classList.contains('on')?stopSim():startSim();
 
 specReset(); setMode(0);
 </script>
